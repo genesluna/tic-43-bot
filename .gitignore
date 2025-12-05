@@ -1,0 +1,30 @@
+# Ambiente virtual Python
+venv/
+.venv/
+env/
+.env
+
+# Arquivos de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Arquivos de distribuição
+dist/
+build/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Histórico de conversas salvas
+historico_*.json
+historico_*.txt
