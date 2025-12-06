@@ -1,6 +1,7 @@
 """Formatação e exibição no terminal."""
 
 import random
+import readline as _readline
 import time
 import threading
 from rich.console import Console
