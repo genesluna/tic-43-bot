@@ -516,6 +516,62 @@ class TestListHistoryFiles:
             assert files[0][0] == "valid.json"
 
 
+class TestPathTraversalProtection:
+    """Testes para proteção contra path traversal."""
+
+    def test_absolute_path_is_blocked(self, tmp_path):
+        """Caminhos absolutos devem ser convertidos para relativos."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "test.json"
+        test_data = {
+            "timestamp": "2024-01-01T12:00:00",
+            "model": "test",
+            "messages": [{"role": "user", "content": "test"}]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            count = manager.load_from_file("/etc/passwd/../../../test.json")
+
+            assert count == 1
+
+    def test_directory_traversal_blocked(self, tmp_path):
+        """Tentativas de directory traversal devem ser bloqueadas."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "test.json"
+        test_data = {
+            "timestamp": "2024-01-01T12:00:00",
+            "model": "test",
+            "messages": [{"role": "user", "content": "test"}]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            count = manager.load_from_file("../../../test.json")
+
+            assert count == 1
+
+
 class TestUnicodeAndLargeMessages:
     """Testes para mensagens Unicode e mensagens grandes."""
 

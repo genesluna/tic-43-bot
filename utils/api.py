@@ -11,11 +11,6 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONNECT_TIMEOUT = 10.0
-DEFAULT_READ_TIMEOUT = 90.0
-DEFAULT_WRITE_TIMEOUT = 10.0
-DEFAULT_POOL_TIMEOUT = 10.0
-
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_INITIAL_BACKOFF = 1.0
 DEFAULT_MAX_BACKOFF = 30.0
@@ -59,10 +54,10 @@ class OpenRouterClient:
         with self._client_lock:
             if self._client is None:
                 timeout = httpx.Timeout(
-                    connect=DEFAULT_CONNECT_TIMEOUT,
-                    read=DEFAULT_READ_TIMEOUT,
-                    write=DEFAULT_WRITE_TIMEOUT,
-                    pool=DEFAULT_POOL_TIMEOUT,
+                    connect=config.HTTP_CONNECT_TIMEOUT,
+                    read=config.HTTP_READ_TIMEOUT,
+                    write=config.HTTP_WRITE_TIMEOUT,
+                    pool=config.HTTP_POOL_TIMEOUT,
                 )
                 self._client = httpx.Client(timeout=timeout)
             return self._client

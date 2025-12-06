@@ -39,13 +39,13 @@ class Config:
     RESPONSE_TONE: str = os.getenv("RESPONSE_TONE", "amigável")
     RESPONSE_FORMAT: str = os.getenv("RESPONSE_FORMAT", "markdown")
 
-    EXIT_COMMANDS: tuple = ("sair", "exit", "quit")
-    CLEAR_COMMANDS: tuple = ("/limpar", "/clear")
-    SAVE_COMMANDS: tuple = ("/salvar", "/save")
-    HELP_COMMANDS: tuple = ("/ajuda", "/help")
-    MODEL_COMMANDS: tuple = ("/modelo",)
-    LOAD_COMMANDS: tuple = ("/carregar", "/load")
-    LIST_COMMANDS: tuple = ("/listar", "/list")
+    EXIT_COMMANDS: tuple[str, ...] = ("sair", "exit", "quit")
+    CLEAR_COMMANDS: tuple[str, ...] = ("/limpar", "/clear")
+    SAVE_COMMANDS: tuple[str, ...] = ("/salvar", "/save")
+    HELP_COMMANDS: tuple[str, ...] = ("/ajuda", "/help")
+    MODEL_COMMANDS: tuple[str, ...] = ("/modelo",)
+    LOAD_COMMANDS: tuple[str, ...] = ("/carregar", "/load")
+    LIST_COMMANDS: tuple[str, ...] = ("/listar", "/list")
 
     MAX_MESSAGE_LENGTH: int = _get_int_env("MAX_MESSAGE_LENGTH", 10000)
     MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)
@@ -54,6 +54,11 @@ class Config:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "WARNING")
     LOG_FORMAT: str = os.getenv("LOG_FORMAT", "console")
     LOG_FILE: str = os.getenv("LOG_FILE", "")
+
+    HTTP_CONNECT_TIMEOUT: float = float(os.getenv("HTTP_CONNECT_TIMEOUT", "10.0"))
+    HTTP_READ_TIMEOUT: float = float(os.getenv("HTTP_READ_TIMEOUT", "90.0"))
+    HTTP_WRITE_TIMEOUT: float = float(os.getenv("HTTP_WRITE_TIMEOUT", "10.0"))
+    HTTP_POOL_TIMEOUT: float = float(os.getenv("HTTP_POOL_TIMEOUT", "10.0"))
 
     @classmethod
     def validate(cls) -> None:

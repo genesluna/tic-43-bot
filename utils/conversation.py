@@ -187,7 +187,7 @@ class ConversationManager:
         Carrega histórico de conversa de um arquivo JSON.
 
         Args:
-            filename: Nome do arquivo ou caminho completo.
+            filename: Nome do arquivo (sempre relativo ao HISTORY_DIR).
 
         Returns:
             Número de mensagens carregadas.
@@ -195,9 +195,8 @@ class ConversationManager:
         Raises:
             ConversationLoadError: Se arquivo inválido ou não encontrado.
         """
-        path = Path(filename)
-        if not path.is_absolute():
-            path = Path(config.HISTORY_DIR) / self._sanitize_filename(filename)
+        safe_filename = self._sanitize_filename(Path(filename).name)
+        path = Path(config.HISTORY_DIR) / safe_filename
 
         if not path.exists():
             logger.warning(f"Tentativa de carregar arquivo inexistente: {path}")
@@ -207,9 +206,9 @@ class ConversationManager:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except json.JSONDecodeError as e:
-            raise ConversationLoadError(f"Arquivo JSON inválido: {e}")
+            raise ConversationLoadError(f"Arquivo JSON inválido: {e}") from e
         except OSError as e:
-            raise ConversationLoadError(f"Erro ao ler arquivo: {e}")
+            raise ConversationLoadError(f"Erro ao ler arquivo: {e}") from e
 
         if not isinstance(data, dict):
             raise ConversationLoadError("Estrutura de arquivo inválida: esperado objeto JSON")

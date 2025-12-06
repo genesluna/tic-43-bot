@@ -81,6 +81,7 @@ def handle_command(
             filename = conversation.save_to_file()
             display.show_success(f"Histórico salvo em: {filename}")
         except IOError as e:
+            logger.error(f"Falha ao salvar histórico: {e}")
             display.show_error(str(e))
         return True
 
@@ -119,6 +120,7 @@ def handle_command(
                     count = conversation.load_from_file(arg)
                     display.show_success(f"Histórico carregado: {count} mensagens")
                 except ConversationLoadError as e:
+                    logger.error(f"Falha ao carregar histórico: {e}")
                     display.show_error(str(e))
             return True
 

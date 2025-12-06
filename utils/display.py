@@ -2,11 +2,18 @@
 
 import logging
 import random
-import readline  # noqa: F401 - imported for side effect (enables input history/editing)
 import time
-
-del readline  # Remove from namespace
 import threading
+
+try:
+    import readline  # noqa: F401 - Unix/Linux input history/editing
+    del readline
+except ImportError:
+    try:
+        import pyreadline3  # noqa: F401 - Windows input history/editing
+        del pyreadline3
+    except ImportError:
+        pass
 from datetime import datetime
 from rich.console import Console
 from rich.markdown import Markdown
@@ -15,11 +22,11 @@ from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
-SPINNER_REFRESH_RATE = 12
-STREAMING_REFRESH_RATE = 10
-WORD_CHANGE_INTERVAL = 5.0
-ANIMATION_FRAME_INTERVAL = 0.08
-THREAD_JOIN_TIMEOUT = 0.2
+SPINNER_REFRESH_RATE = 12  # Hz - spinner animation refresh rate
+STREAMING_REFRESH_RATE = 10  # Hz - streaming text refresh rate
+WORD_CHANGE_INTERVAL = 5.0  # seconds - interval between rotating words
+ANIMATION_FRAME_INTERVAL = 0.08  # seconds - delay between animation frames
+THREAD_JOIN_TIMEOUT = 0.2  # seconds - max wait for thread cleanup
 
 THINKING_WORDS: list[str] = [
     "Pensando",
@@ -100,7 +107,13 @@ class RotatingSpinner:
                 self.word_index = (self.word_index + 1) % len(THINKING_WORDS)
                 self.last_word_change = time.time()
 
-            self.live.update(self._get_renderable())
+            live = self.live
+            if live is None:
+                break
+            try:
+                live.update(self._get_renderable())
+            except Exception:
+                break
             self.char_index = (self.char_index + 1) % len(self.spinner_chars)
 
     def start(self) -> None:
@@ -122,11 +135,13 @@ class RotatingSpinner:
     def stop(self) -> None:
         """Para o spinner. Seguro para chamadas múltiplas."""
         self._stop_event.set()
-        if self.thread:
-            self.thread.join(timeout=THREAD_JOIN_TIMEOUT)
         self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=THREAD_JOIN_TIMEOUT)
+        self.thread = None
         if self.live:
             self.live.stop()
+            self.live = None
         elapsed = time.time() - self.start_time if self.start_time else 0
         logger.debug(f"Spinner parado após {elapsed:.1f}s")
 
@@ -157,10 +172,12 @@ class StreamingTextDisplay:
             self._buffer += chunk
             if not self.running or self.live is None:
                 return
-            live = self.live
+            current_text = self._buffer
 
+        renderable = Markdown(current_text) if current_text else Text("")
         try:
-            live.update(self._get_renderable())
+            if self.live is not None:
+                self.live.update(renderable)
         except Exception as e:
             logger.debug(f"Falha ao atualizar display: {e}")
 
@@ -189,13 +206,15 @@ class StreamingTextDisplay:
 
     def stop(self) -> None:
         """Para exibição e finaliza."""
-        self.running = False
+        with self._lock:
+            self.running = False
+            current_text = self._buffer
+            total_chars = len(self._buffer)
         if self.live:
-            self.live.update(self._get_renderable())
+            renderable = Markdown(current_text) if current_text else Text("")
+            self.live.update(renderable)
             self.live.stop()
             self.live = None
-        with self._lock:
-            total_chars = len(self._buffer)
         logger.debug(f"Streaming finalizado ({total_chars} chars recebidos)")
         self.console.print()
 

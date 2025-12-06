@@ -478,3 +478,91 @@ class TestDisplayStreaming:
         result = display.stop_streaming()
 
         assert result == ""
+
+
+class TestConcurrentScenarios:
+    """Testes de estresse para cenários concorrentes."""
+
+    def test_concurrent_chunk_addition_during_stop(self):
+        """Adicionar chunks durante stop não deve causar erro."""
+        from rich.console import Console
+        import threading
+        import time
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+        errors = []
+
+        streaming.start()
+
+        def add_chunks():
+            try:
+                for i in range(50):
+                    streaming.add_chunk(f"chunk{i}")
+                    time.sleep(0.001)
+            except Exception as e:
+                errors.append(e)
+
+        def stop_after_delay():
+            time.sleep(0.02)
+            streaming.stop()
+
+        add_thread = threading.Thread(target=add_chunks)
+        stop_thread = threading.Thread(target=stop_after_delay)
+
+        add_thread.start()
+        stop_thread.start()
+
+        add_thread.join()
+        stop_thread.join()
+
+        assert len(errors) == 0
+
+    def test_concurrent_spinner_token_updates(self):
+        """Múltiplas atualizações de token simultâneas."""
+        from rich.console import Console
+        import threading
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+
+        def update_tokens(start_val):
+            for i in range(100):
+                spinner.update_tokens(start_val + i)
+
+        threads = [
+            threading.Thread(target=update_tokens, args=(i * 100,))
+            for i in range(10)
+        ]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert isinstance(spinner.token_count, int)
+
+    def test_rapid_start_stop_cycles(self):
+        """Ciclos rápidos de start/stop não devem causar erro."""
+        import threading
+
+        display = Display()
+        errors = []
+
+        def cycle():
+            try:
+                for _ in range(20):
+                    display.start_spinner()
+                    display.stop_spinner()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=cycle) for _ in range(3)]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert display.spinner.running is False

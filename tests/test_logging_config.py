@@ -190,6 +190,7 @@ class TestSetupLogging:
         """Limpa handlers após cada teste."""
         root_logger = logging.getLogger()
         for handler in root_logger.handlers[:]:
+            handler.close()
             root_logger.removeHandler(handler)
 
     def test_setup_default_no_handlers(self):
