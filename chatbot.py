@@ -217,6 +217,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
                     if response:
                         conversation.add_assistant_message(response)
+                    else:
+                        logger.warning("Resposta vazia recebida da API")
+                        display.show_info("Resposta vazia recebida. Tente novamente.")
+                        conversation.remove_last_user_message()
 
                 except APIError as e:
                     logger.error("Erro na API: %s", e)
