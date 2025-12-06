@@ -3,39 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import httpx
-from utils.api import OpenRouterClient, APIError, count_tokens
-
-
-class TestCountTokens:
-    """Testes para a função count_tokens."""
-
-    def test_count_tokens_simple(self):
-        """Verifica contagem de tokens em texto simples."""
-        text = "Hello, world!"
-        tokens = count_tokens(text)
-
-        assert tokens > 0
-        assert isinstance(tokens, int)
-
-    def test_count_tokens_empty(self):
-        """Verifica contagem de tokens em texto vazio."""
-        tokens = count_tokens("")
-
-        assert tokens == 0
-
-    def test_count_tokens_portuguese(self):
-        """Verifica contagem de tokens em português."""
-        text = "Olá, como você está?"
-        tokens = count_tokens(text)
-
-        assert tokens > 0
-
-    def test_count_tokens_with_unknown_model(self):
-        """Verifica fallback para modelo desconhecido."""
-        text = "Test text"
-        tokens = count_tokens(text, model="unknown-model")
-
-        assert tokens > 0
+from utils.api import OpenRouterClient, APIError
 
 
 class TestOpenRouterClient:

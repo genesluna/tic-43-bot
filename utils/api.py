@@ -4,8 +4,6 @@ import json
 import logging
 import threading
 import httpx
-import tiktoken
-from functools import lru_cache
 from typing import Generator
 from .config import config
 
@@ -15,35 +13,6 @@ DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_READ_TIMEOUT = 90.0
 DEFAULT_WRITE_TIMEOUT = 10.0
 DEFAULT_POOL_TIMEOUT = 10.0
-
-
-@lru_cache(maxsize=8)
-def _get_encoding(model: str) -> tiktoken.Encoding:
-    """Retorna encoding cacheado para o modelo."""
-    try:
-        return tiktoken.encoding_for_model(model)
-    except KeyError:
-        return tiktoken.get_encoding("cl100k_base")
-
-
-def count_tokens(text: str, model: str | None = None) -> int:
-    """
-    Conta o número aproximado de tokens em um texto.
-
-    Nota: A contagem é aproximada pois usa o encoding cl100k_base como fallback
-    para modelos não-OpenAI.
-
-    Args:
-        text: Texto para contar tokens.
-        model: Modelo para usar o encoding apropriado. Se None, usa cl100k_base.
-
-    Returns:
-        Número aproximado de tokens.
-    """
-    if model is None:
-        model = config.OPENROUTER_MODEL
-    encoding = _get_encoding(model)
-    return len(encoding.encode(text))
 
 
 class APIError(Exception):

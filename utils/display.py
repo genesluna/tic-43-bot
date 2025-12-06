@@ -57,7 +57,7 @@ class RotatingSpinner:
             (char, "cyan"),
             " ",
             (f"{word}…", "dim"),
-            (" (esc para interromper", "dim"),
+            (" (Ctrl+C para cancelar", "dim"),
             (" · ", "dim"),
             (f"{elapsed}s", "dim"),
         ]
