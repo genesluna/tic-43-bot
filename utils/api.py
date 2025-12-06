@@ -43,6 +43,7 @@ class OpenRouterClient:
         self.model = config.OPENROUTER_MODEL
         self._client: httpx.Client | None = None
         self._client_lock = threading.Lock()
+        logger.debug(f"Cliente inicializado com modelo: {self.model}")
 
     def __repr__(self) -> str:
         return f"OpenRouterClient(model={self.model})"
@@ -192,6 +193,7 @@ class OpenRouterClient:
                 if content is None:
                     raise APIError("Resposta da API não contém conteúdo.")
 
+                logger.debug(f"Resposta recebida ({len(content)} chars)")
                 return content
 
             except httpx.TimeoutException:
@@ -239,6 +241,7 @@ class OpenRouterClient:
             "stream": True,
         }
 
+        logger.debug(f"Iniciando streaming com {len(messages)} mensagens")
         last_error: Exception | None = None
 
         for attempt in range(DEFAULT_MAX_RETRIES):
@@ -323,6 +326,7 @@ class OpenRouterClient:
             raise ValueError("Modelo deve ser uma string não vazia.")
         if "/" not in model:
             raise ValueError("Modelo deve estar no formato 'provider/model-name'.")
+        logger.info(f"Modelo alterado para: {model}")
         self.model = model
 
     def get_model(self) -> str:

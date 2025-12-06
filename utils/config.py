@@ -51,6 +51,10 @@ class Config:
     MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)
     HISTORY_DIR: str = os.getenv("HISTORY_DIR", "./history")
 
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "WARNING")
+    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "console")
+    LOG_FILE: str = os.getenv("LOG_FILE", "")
+
     @classmethod
     def validate(cls) -> None:
         """Valida as configurações obrigatórias."""

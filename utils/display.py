@@ -1,5 +1,6 @@
 """Formatação e exibição no terminal."""
 
+import logging
 import random
 import readline
 import time
@@ -11,6 +12,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
 from rich.text import Text
+
+logger = logging.getLogger(__name__)
 
 
 THINKING_WORDS: list[str] = [
@@ -109,6 +112,7 @@ class RotatingSpinner:
         self.live.start()
         self.thread = threading.Thread(target=self._animate, daemon=True)
         self.thread.start()
+        logger.debug("Spinner iniciado")
 
     def stop(self) -> None:
         """Para o spinner. Seguro para chamadas múltiplas."""
@@ -118,6 +122,8 @@ class RotatingSpinner:
             self.thread.join(timeout=0.2)
         if self.live:
             self.live.stop()
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        logger.debug(f"Spinner parado após {elapsed:.1f}s")
 
 
 class StreamingTextDisplay:
@@ -183,6 +189,9 @@ class StreamingTextDisplay:
             self.live.update(self._get_renderable())
             self.live.stop()
             self.live = None
+        with self._lock:
+            total_chars = len(self._buffer)
+        logger.debug(f"Streaming finalizado ({total_chars} chars recebidos)")
         self.console.print()
 
 

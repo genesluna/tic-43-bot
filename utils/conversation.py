@@ -1,11 +1,14 @@
 """Gerenciamento do histórico de conversas."""
 
 import json
+import logging
 import os
 import re
 from datetime import datetime
 from pathlib import Path
 from .config import config
+
+logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_CONTENT_SIZE = 100000
 
@@ -58,11 +61,13 @@ class ConversationManager:
         """Adiciona uma mensagem do usuário."""
         self.messages.append({"role": "user", "content": content})
         self._enforce_history_limit()
+        logger.debug(f"Mensagem do usuário adicionada ({len(content)} chars)")
 
     def add_assistant_message(self, content: str) -> None:
         """Adiciona uma mensagem do assistente."""
         self.messages.append({"role": "assistant", "content": content})
         self._enforce_history_limit()
+        logger.debug(f"Mensagem do assistente adicionada ({len(content)} chars)")
 
     def remove_last_user_message(self) -> str | None:
         """
@@ -132,8 +137,10 @@ class ConversationManager:
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
+            logger.info(f"Histórico salvo: {filepath} ({len(history['messages'])} mensagens)")
             return str(filepath)
         except (OSError, PermissionError) as e:
+            logger.error(f"Falha ao salvar histórico: {e}")
             raise IOError(f"Erro ao salvar arquivo: {e}") from e
 
     def message_count(self) -> int:
@@ -184,6 +191,7 @@ class ConversationManager:
             path = Path(config.HISTORY_DIR) / self._sanitize_filename(filename)
 
         if not path.exists():
+            logger.warning(f"Tentativa de carregar arquivo inexistente: {path}")
             raise ConversationLoadError(f"Arquivo não encontrado: {path}")
 
         try:
@@ -219,4 +227,5 @@ class ConversationManager:
             self.messages.append({"role": msg["role"], "content": msg["content"]})
 
         self._enforce_history_limit()
+        logger.info(f"Histórico carregado: {path} ({len(messages)} mensagens)")
         return len(messages)

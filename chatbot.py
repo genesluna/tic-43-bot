@@ -6,11 +6,15 @@ Um chatbot interativo que utiliza a API OpenRouter para
 manter conversas contextualizadas com o usuário.
 """
 
+import logging
 import sys
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
+from utils.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def handle_command(
@@ -28,6 +32,7 @@ def handle_command(
     user_input_lower = user_input.lower().strip()
 
     if user_input_lower in config.EXIT_COMMANDS:
+        logger.info("Comando de saída recebido")
         return False
 
     if user_input_lower in config.CLEAR_COMMANDS:
@@ -54,9 +59,12 @@ def handle_command(
                 display.show_model_info(client.get_model())
             else:
                 try:
+                    old_model = client.get_model()
                     client.set_model(arg)
+                    logger.info(f"Modelo alterado: {old_model} -> {arg}")
                     display.show_model_changed(arg)
                 except ValueError as e:
+                    logger.warning(f"Modelo inválido: {arg}")
                     display.show_error(str(e))
             return True
 
@@ -83,11 +91,15 @@ def handle_command(
 
 def main():
     """Loop principal do chatbot."""
+    setup_logging()
+    logger.info("Iniciando chatbot")
+
     display = Display()
 
     try:
         Config.validate()
     except ConfigurationError as e:
+        logger.error(f"Erro de configuração: {e}")
         display.show_error(str(e))
         sys.exit(1)
 
@@ -140,6 +152,7 @@ def main():
                         conversation.add_assistant_message(response)
 
                 except APIError as e:
+                    logger.error(f"Erro na API: {e}")
                     try:
                         display.stop_spinner()
                     except Exception:
