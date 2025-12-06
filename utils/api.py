@@ -3,6 +3,7 @@
 import json
 import logging
 import threading
+import time
 import httpx
 from typing import Generator
 from .config import config
@@ -14,9 +15,23 @@ DEFAULT_READ_TIMEOUT = 90.0
 DEFAULT_WRITE_TIMEOUT = 10.0
 DEFAULT_POOL_TIMEOUT = 10.0
 
+# Rate limiting configuration
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_INITIAL_BACKOFF = 1.0  # seconds
+DEFAULT_MAX_BACKOFF = 30.0  # seconds
+DEFAULT_BACKOFF_MULTIPLIER = 2.0
+
 
 class APIError(Exception):
     """Erro de comunicação com a API."""
+
+
+class RateLimitError(APIError):
+    """Erro de rate limiting da API."""
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class OpenRouterClient:
@@ -66,6 +81,23 @@ class OpenRouterClient:
             sanitized += "..."
         return sanitized
 
+    def _get_retry_after(self, response: httpx.Response) -> float | None:
+        """Extrai tempo de espera do header Retry-After, se disponível."""
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return float(retry_after)
+            except ValueError:
+                pass
+        return None
+
+    def _calculate_backoff(self, attempt: int, retry_after: float | None = None) -> float:
+        """Calcula tempo de espera com exponential backoff."""
+        if retry_after is not None:
+            return min(retry_after, DEFAULT_MAX_BACKOFF)
+        backoff = DEFAULT_INITIAL_BACKOFF * (DEFAULT_BACKOFF_MULTIPLIER ** attempt)
+        return min(backoff, DEFAULT_MAX_BACKOFF)
+
     def send_message(self, messages: list[dict]) -> str:
         """
         Envia mensagens para a API e retorna a resposta.
@@ -78,6 +110,7 @@ class OpenRouterClient:
 
         Raises:
             APIError: Em caso de erro na comunicação.
+            RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
         if not self._api_key:
             raise APIError(
@@ -92,39 +125,58 @@ class OpenRouterClient:
             "messages": messages,
         }
 
-        try:
-            client = self._get_client()
-            response = client.post(
-                self.base_url,
-                headers=self._get_headers(),
-                json=payload,
-            )
+        last_error: Exception | None = None
 
-            if response.status_code == 401:
-                raise APIError("Chave de API inválida. Verifique sua configuração.")
+        for attempt in range(DEFAULT_MAX_RETRIES):
+            try:
+                client = self._get_client()
+                response = client.post(
+                    self.base_url,
+                    headers=self._get_headers(),
+                    json=payload,
+                )
 
-            if response.status_code == 429:
-                raise APIError("Limite de requisições excedido. Tente novamente mais tarde.")
+                if response.status_code == 401:
+                    raise APIError("Chave de API inválida. Verifique sua configuração.")
 
-            if response.status_code >= 400:
-                error_detail = self._sanitize_error_message(response.text)
-                raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
+                if response.status_code == 429:
+                    retry_after = self._get_retry_after(response)
+                    backoff = self._calculate_backoff(attempt, retry_after)
+                    logger.warning(
+                        f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                        f"Aguardando {backoff:.1f}s..."
+                    )
+                    if attempt < DEFAULT_MAX_RETRIES - 1:
+                        time.sleep(backoff)
+                        continue
+                    raise RateLimitError(
+                        "Limite de requisições excedido após várias tentativas.",
+                        retry_after=retry_after,
+                    )
 
-            data = response.json()
+                if response.status_code >= 400:
+                    error_detail = self._sanitize_error_message(response.text)
+                    raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
 
-            if "choices" not in data or not data["choices"]:
-                raise APIError("Resposta da API não contém dados válidos.")
+                data = response.json()
 
-            content = data["choices"][0].get("message", {}).get("content")
-            if content is None:
-                raise APIError("Resposta da API não contém conteúdo.")
+                if "choices" not in data or not data["choices"]:
+                    raise APIError("Resposta da API não contém dados válidos.")
 
-            return content
+                content = data["choices"][0].get("message", {}).get("content")
+                if content is None:
+                    raise APIError("Resposta da API não contém conteúdo.")
 
-        except httpx.TimeoutException:
-            raise APIError("Tempo limite excedido. Verifique sua conexão.")
-        except httpx.ConnectError:
-            raise APIError("Não foi possível conectar à API. Verifique sua conexão.")
+                return content
+
+            except httpx.TimeoutException:
+                last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
+            except httpx.ConnectError:
+                last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
+
+        if last_error:
+            raise last_error
+        raise APIError("Erro desconhecido na comunicação com a API.")
 
     def send_message_stream(self, messages: list[dict]) -> Generator[str, None, None]:
         """
@@ -138,6 +190,7 @@ class OpenRouterClient:
 
         Raises:
             APIError: Em caso de erro na comunicação.
+            RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
         if not self._api_key:
             raise APIError(
@@ -153,49 +206,70 @@ class OpenRouterClient:
             "stream": True,
         }
 
-        try:
-            client = self._get_client()
-            with client.stream(
-                "POST",
-                self.base_url,
-                headers=self._get_headers(),
-                json=payload,
-            ) as response:
-                if response.status_code == 401:
-                    raise APIError("Chave de API inválida. Verifique sua configuração.")
+        last_error: Exception | None = None
 
-                if response.status_code == 429:
-                    raise APIError("Limite de requisições excedido. Tente novamente mais tarde.")
+        for attempt in range(DEFAULT_MAX_RETRIES):
+            try:
+                client = self._get_client()
+                with client.stream(
+                    "POST",
+                    self.base_url,
+                    headers=self._get_headers(),
+                    json=payload,
+                ) as response:
+                    if response.status_code == 401:
+                        raise APIError("Chave de API inválida. Verifique sua configuração.")
 
-                if response.status_code >= 400:
-                    response.read()
-                    error_detail = self._sanitize_error_message(response.text)
-                    raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
+                    if response.status_code == 429:
+                        retry_after = self._get_retry_after(response)
+                        backoff = self._calculate_backoff(attempt, retry_after)
+                        logger.warning(
+                            f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                            f"Aguardando {backoff:.1f}s..."
+                        )
+                        if attempt < DEFAULT_MAX_RETRIES - 1:
+                            time.sleep(backoff)
+                            continue
+                        raise RateLimitError(
+                            "Limite de requisições excedido após várias tentativas.",
+                            retry_after=retry_after,
+                        )
 
-                for line in response.iter_lines():
-                    if not line or not line.startswith("data: "):
-                        continue
+                    if response.status_code >= 400:
+                        response.read()
+                        error_detail = self._sanitize_error_message(response.text)
+                        raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
 
-                    data_str = line[6:]
+                    for line in response.iter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
 
-                    if data_str == "[DONE]":
-                        break
+                        data_str = line[6:]
 
-                    try:
-                        data = json.loads(data_str)
-                        if "choices" in data and data["choices"]:
-                            delta = data["choices"][0].get("delta", {})
-                            content = delta.get("content")
-                            if content:
-                                yield content
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}")
-                        continue
+                        if data_str == "[DONE]":
+                            break
 
-        except httpx.TimeoutException:
-            raise APIError("Tempo limite excedido. Verifique sua conexão.")
-        except httpx.ConnectError:
-            raise APIError("Não foi possível conectar à API. Verifique sua conexão.")
+                        try:
+                            data = json.loads(data_str)
+                            if "choices" in data and data["choices"]:
+                                delta = data["choices"][0].get("delta", {})
+                                content = delta.get("content")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}")
+                            continue
+
+                    return  # Success, exit retry loop
+
+            except httpx.TimeoutException:
+                last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
+            except httpx.ConnectError:
+                last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
+
+        if last_error:
+            raise last_error
+        raise APIError("Erro desconhecido na comunicação com a API.")
 
     def set_model(self, model: str) -> None:
         """
