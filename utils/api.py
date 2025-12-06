@@ -6,7 +6,7 @@ import random
 import threading
 import time
 import httpx
-from typing import Generator
+from typing import Any, Generator, Self
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -48,10 +48,10 @@ class OpenRouterClient:
     def __repr__(self) -> str:
         return f"OpenRouterClient(model={self.model})"
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         self.close()
 
     def _get_client(self) -> httpx.Client:
@@ -67,7 +67,7 @@ class OpenRouterClient:
                 self._client = httpx.Client(timeout=timeout)
             return self._client
 
-    def _get_headers(self) -> dict:
+    def _get_headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -130,7 +130,7 @@ class OpenRouterClient:
             time.sleep(backoff)
         return retry_after, should_retry
 
-    def send_message(self, messages: list[dict]) -> str:
+    def send_message(self, messages: list[dict[str, str]]) -> str:
         """
         Envia mensagens para a API e retorna a resposta.
 
@@ -213,7 +213,7 @@ class OpenRouterClient:
             raise last_error
         raise APIError("Erro desconhecido na comunicação com a API.")
 
-    def send_message_stream(self, messages: list[dict]) -> Generator[str, None, None]:
+    def send_message_stream(self, messages: list[dict[str, str]]) -> Generator[str, None, None]:
         """
         Envia mensagens para a API e retorna a resposta em streaming.
 

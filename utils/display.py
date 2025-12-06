@@ -39,20 +39,20 @@ THINKING_WORDS: list[str] = [
 class RotatingSpinner:
     """Spinner com palavras rotativas usando Rich Live."""
 
-    def __init__(self, console: Console):
-        self.console = console
-        self.live = None
-        self.running = False
-        self.thread = None
-        self.spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-        self.char_index = 0
-        self.word_index = 0
-        self.word_change_interval = 5.0
-        self.last_word_change = 0
-        self.start_time = 0
-        self._token_count = 0
-        self._lock = threading.Lock()
-        self._stop_event = threading.Event()
+    def __init__(self, console: Console) -> None:
+        self.console: Console = console
+        self.live: Live | None = None
+        self.running: bool = False
+        self.thread: threading.Thread | None = None
+        self.spinner_chars: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        self.char_index: int = 0
+        self.word_index: int = 0
+        self.word_change_interval: float = 5.0
+        self.last_word_change: float = 0
+        self.start_time: float = 0
+        self._token_count: int = 0
+        self._lock: threading.Lock = threading.Lock()
+        self._stop_event: threading.Event = threading.Event()
 
     def _get_renderable(self) -> Text:
         char = self.spinner_chars[self.char_index]
@@ -88,7 +88,7 @@ class RotatingSpinner:
         with self._lock:
             return self._token_count
 
-    def _animate(self):
+    def _animate(self) -> None:
         self.last_word_change = time.time()
         while not self._stop_event.wait(timeout=0.08):
             if time.time() - self.last_word_change >= self.word_change_interval:
@@ -129,12 +129,12 @@ class RotatingSpinner:
 class StreamingTextDisplay:
     """Exibição de texto em streaming com buffer thread-safe."""
 
-    def __init__(self, console: Console):
-        self.console = console
+    def __init__(self, console: Console) -> None:
+        self.console: Console = console
         self.live: Live | None = None
-        self.running = False
-        self._buffer = ""
-        self._lock = threading.Lock()
+        self.running: bool = False
+        self._buffer: str = ""
+        self._lock: threading.Lock = threading.Lock()
 
     def _get_renderable(self) -> Markdown | Text:
         """Retorna o texto atual como Markdown."""
@@ -198,10 +198,10 @@ class StreamingTextDisplay:
 class Display:
     """Gerencia a exibição formatada no terminal."""
 
-    def __init__(self):
-        self.console = Console()
-        self.spinner = RotatingSpinner(self.console)
-        self.streaming = StreamingTextDisplay(self.console)
+    def __init__(self) -> None:
+        self.console: Console = Console()
+        self.spinner: RotatingSpinner = RotatingSpinner(self.console)
+        self.streaming: StreamingTextDisplay = StreamingTextDisplay(self.console)
 
     def show_banner(self) -> None:
         """Exibe o banner de boas-vindas."""

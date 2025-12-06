@@ -6,13 +6,14 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 
 class StructuredFormatter(logging.Formatter):
     """Formatter que produz logs em formato JSON estruturado."""
 
     def format(self, record: logging.LogRecord) -> str:
-        log_data = {
+        log_data: dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
