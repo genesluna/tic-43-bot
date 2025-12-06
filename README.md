@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-283%20passed-brightgreen.svg)](#testes)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-290%20passed-brightgreen.svg)](#testes)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -179,7 +179,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 283 testes com 93% de cobertura.
+O projeto possui 290 testes com 94% de cobertura.
 
 ```bash
 # Executar testes

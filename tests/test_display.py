@@ -58,6 +58,43 @@ class TestRotatingSpinner:
 
         assert renderable is not None
 
+    def test_repr(self):
+        """Verifica representação string do spinner."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+
+        assert "RotatingSpinner" in repr(spinner)
+        assert "running=False" in repr(spinner)
+
+        spinner.start()
+        assert "running=True" in repr(spinner)
+        spinner.stop()
+
+    def test_format_tokens_thousands(self):
+        """Verifica formatação de tokens em milhares (K)."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+
+        assert spinner._format_tokens(1000) == "~1.0K"
+        assert spinner._format_tokens(1500) == "~1.5K"
+        assert spinner._format_tokens(10000) == "~10.0K"
+        assert spinner._format_tokens(999999) == "~1000.0K"
+
+    def test_format_tokens_millions(self):
+        """Verifica formatação de tokens em milhões (M)."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+
+        assert spinner._format_tokens(1000000) == "~1.0M"
+        assert spinner._format_tokens(1500000) == "~1.5M"
+        assert spinner._format_tokens(10000000) == "~10.0M"
+
 
 class TestDisplay:
     """Testes para a classe Display."""
@@ -133,6 +170,19 @@ class TestDisplay:
         assert "openai/gpt-4" in captured.out
         assert "/carregar" in captured.out
 
+    def test_show_history_list_invalid_timestamp(self, capsys):
+        """Verifica fallback para timestamp inválido."""
+        display = Display()
+        files = [
+            ("history_1.json", "invalid-timestamp", "openai/gpt-4"),
+            ("history_2.json", "not-a-date", "anthropic/claude-3"),
+        ]
+        display.show_history_list(files)
+
+        captured = capsys.readouterr()
+        assert "invalid-timestamp" in captured.out
+        assert "not-a-date" in captured.out
+
     def test_show_banner(self, capsys):
         """Verifica se o banner é exibido."""
         display = Display()
@@ -162,6 +212,18 @@ class TestDisplay:
         captured = capsys.readouterr()
         assert "Até logo" in captured.out
         assert "👋" not in captured.out
+
+    def test_repr(self):
+        """Verifica representação string do Display."""
+        display = Display()
+
+        assert "Display" in repr(display)
+        assert "spinner=False" in repr(display)
+        assert "streaming=False" in repr(display)
+
+        display.start_spinner()
+        assert "spinner=True" in repr(display)
+        display.stop_spinner()
 
     def test_show_bot_message(self, capsys):
         """Verifica se mensagem do bot é exibida."""
@@ -433,6 +495,33 @@ class TestStreamingTextDisplay:
         streaming.stop()
 
         assert streaming.running is False
+
+    def test_repr(self):
+        """Verifica representação string do streaming display."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        assert "StreamingTextDisplay" in repr(streaming)
+        assert "running=False" in repr(streaming)
+        assert "buffer_size=0" in repr(streaming)
+
+        streaming.add_chunk("Hello World")
+        assert "buffer_size=11" in repr(streaming)
+
+    def test_get_renderable_with_content(self):
+        """Verifica que Markdown é criado quando buffer tem conteúdo."""
+        from rich.console import Console
+        from rich.markdown import Markdown
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+        streaming.add_chunk("**Bold text**")
+
+        renderable = streaming._get_renderable()
+
+        assert isinstance(renderable, Markdown)
 
     def test_buffer_truncation_warning(self, capsys):
         """Verifica se aviso de truncamento é exibido."""
