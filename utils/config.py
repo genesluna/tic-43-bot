@@ -47,6 +47,7 @@ class Config:
 
     MAX_MESSAGE_LENGTH: int = _get_int_env("MAX_MESSAGE_LENGTH", 10000)
     MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)
+    HISTORY_DIR: str = os.getenv("HISTORY_DIR", "./history")
 
     @classmethod
     def validate(cls) -> None:

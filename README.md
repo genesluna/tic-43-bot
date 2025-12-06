@@ -114,6 +114,7 @@ As seguintes variáveis podem ser configuradas no arquivo `.env`:
 | `RESPONSE_FORMAT`    | Formato do texto             | `markdown`                                 |
 | `MAX_MESSAGE_LENGTH` | Limite de caracteres/mensagem| `10000`                                    |
 | `MAX_HISTORY_SIZE`   | Máximo de mensagens no histórico | `50`                                   |
+| `HISTORY_DIR`        | Diretório para salvar histórico | `./history`                             |
 
 ### Exemplos de Personalização
 

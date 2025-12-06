@@ -173,8 +173,24 @@ class OpenRouterClient:
 
             except httpx.TimeoutException:
                 last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
+                if attempt < DEFAULT_MAX_RETRIES - 1:
+                    backoff = self._calculate_backoff(attempt)
+                    logger.warning(
+                        f"Timeout. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                        f"Aguardando {backoff:.1f}s..."
+                    )
+                    time.sleep(backoff)
+                    continue
             except httpx.ConnectError:
                 last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
+                if attempt < DEFAULT_MAX_RETRIES - 1:
+                    backoff = self._calculate_backoff(attempt)
+                    logger.warning(
+                        f"Erro de conexão. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                        f"Aguardando {backoff:.1f}s..."
+                    )
+                    time.sleep(backoff)
+                    continue
 
         if last_error:
             raise last_error
@@ -262,12 +278,28 @@ class OpenRouterClient:
                             logger.warning(f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}")
                             continue
 
-                    return  # Success, exit retry loop
+                    return
 
             except httpx.TimeoutException:
                 last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
+                if attempt < DEFAULT_MAX_RETRIES - 1:
+                    backoff = self._calculate_backoff(attempt)
+                    logger.warning(
+                        f"Timeout. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                        f"Aguardando {backoff:.1f}s..."
+                    )
+                    time.sleep(backoff)
+                    continue
             except httpx.ConnectError:
                 last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
+                if attempt < DEFAULT_MAX_RETRIES - 1:
+                    backoff = self._calculate_backoff(attempt)
+                    logger.warning(
+                        f"Erro de conexão. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                        f"Aguardando {backoff:.1f}s..."
+                    )
+                    time.sleep(backoff)
+                    continue
 
         if last_error:
             raise last_error

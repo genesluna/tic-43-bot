@@ -11,8 +11,6 @@ from .config import config
 class ConversationManager:
     """Gerencia o histórico de mensagens da conversa."""
 
-    SAVE_DIR = Path("./history")
-
     def __init__(self):
         self.messages: list[dict] = []
         self.system_prompt = self._build_system_prompt()
@@ -109,14 +107,15 @@ class ConversationManager:
         Raises:
             IOError: Em caso de erro ao salvar.
         """
-        self.SAVE_DIR.mkdir(exist_ok=True)
+        save_dir = Path(config.HISTORY_DIR)
+        save_dir.mkdir(exist_ok=True)
 
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"history_{timestamp}.json"
 
         safe_filename = self._sanitize_filename(filename)
-        filepath = self.SAVE_DIR / safe_filename
+        filepath = save_dir / safe_filename
 
         history = {
             "timestamp": datetime.now().isoformat(),

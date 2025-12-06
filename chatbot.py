@@ -101,6 +101,7 @@ def main():
                     for chunk in client.send_message_stream(conversation.get_messages()):
                         response_chunks.append(chunk)
                         char_count += len(chunk)
+                        # Approximate token count: ~4 chars per token for English/Portuguese
                         display.update_spinner_tokens(char_count // 4)
 
                     display.stop_spinner()
