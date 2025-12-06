@@ -247,6 +247,8 @@ class TestOpenRouterClient:
         mock_stream_response.__exit__ = MagicMock(return_value=False)
 
         mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
         mock_client.stream.return_value = mock_stream_response
         mock_client_class.return_value = mock_client
 
@@ -266,6 +268,8 @@ class TestOpenRouterClient:
         mock_stream_response.__exit__ = MagicMock(return_value=False)
 
         mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
         mock_client.stream.return_value = mock_stream_response
         mock_client_class.return_value = mock_client
 
