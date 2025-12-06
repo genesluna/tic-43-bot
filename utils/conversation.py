@@ -8,13 +8,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TypedDict
 
-from .config import config
+from .config import config, MAX_MESSAGE_CONTENT_SIZE
 
-__all__ = ["ConversationManager", "ConversationLoadError", "Message", "MAX_MESSAGE_CONTENT_SIZE"]
+__all__ = ["ConversationManager", "ConversationLoadError", "Message"]
 
 logger = logging.getLogger(__name__)
-
-MAX_MESSAGE_CONTENT_SIZE = 100000
 
 
 class Message(TypedDict):
@@ -127,12 +125,14 @@ class ConversationManager:
         """Remove caracteres perigosos do nome do arquivo."""
         basename = os.path.basename(filename)
         sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', basename)
-        sanitized = sanitized.strip('. ')
+        sanitized = re.sub(r'\s+', '_', sanitized)
+        # Remove all extensions (e.g., .json, .bak, .json.bak)
+        while re.search(r'\.[a-zA-Z0-9]+$', sanitized):
+            sanitized = re.sub(r'\.[a-zA-Z0-9]+$', '', sanitized)
+        sanitized = sanitized.strip('._')
         if not sanitized:
             sanitized = "history"
-        if not sanitized.endswith('.json'):
-            sanitized += '.json'
-        return sanitized
+        return sanitized + '.json'
 
     def save_to_file(self, filename: str | None = None) -> str:
         """

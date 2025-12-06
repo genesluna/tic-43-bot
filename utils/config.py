@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-__all__ = ["Config", "ConfigurationError", "config"]
+# Limite máximo de caracteres por mensagem armazenada/enviada à API.
+# Diferente de MAX_MESSAGE_LENGTH (limite de entrada do usuário para UX).
+MAX_MESSAGE_CONTENT_SIZE = 100_000
+
+__all__ = ["Config", "ConfigurationError", "config", "MAX_MESSAGE_CONTENT_SIZE"]
 
 
 class ConfigurationError(Exception):
@@ -99,6 +103,11 @@ class Config:
 
     @_ThreadSafeCachedProperty
     def MAX_MESSAGE_LENGTH(self) -> int:
+        """Limite de caracteres para entrada do usuário no prompt.
+
+        Este limite é para UX no input. O limite técnico para mensagens
+        armazenadas/enviadas à API é 100.000 caracteres (MAX_MESSAGE_CONTENT_SIZE).
+        """
         return self._get_int_env("MAX_MESSAGE_LENGTH", 10000)
 
     @_ThreadSafeCachedProperty

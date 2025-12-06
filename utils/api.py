@@ -8,7 +8,7 @@ import threading
 import time
 import httpx
 from typing import Any, Generator, Iterator, Self
-from .config import config
+from .config import config, MAX_MESSAGE_CONTENT_SIZE
 
 __all__ = ["OpenRouterClient", "APIError", "RateLimitError", "StreamingResponse"]
 
@@ -35,9 +35,6 @@ MASK_SUFFIX_LENGTH = 4
 ERROR_MESSAGE_MAX_LENGTH = 100
 SSE_DATA_PREFIX_LENGTH = 6
 SSE_LOG_MAX_LENGTH = 100
-
-# Message validation limits
-MAX_MESSAGE_CONTENT_SIZE = 100000  # Same limit as conversation.py
 
 # Valid message roles
 VALID_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
@@ -486,12 +483,21 @@ class OpenRouterClient:
             ValueError: Se o modelo for inválido.
         """
         if not model or not isinstance(model, str):
-            raise ValueError("Modelo deve ser uma string não vazia.")
+            raise ValueError(
+                "Nome do modelo inválido. "
+                "Use o formato 'provider/model-name' (ex: openai/gpt-4o-mini)."
+            )
         model = model.strip()
         if not model:
-            raise ValueError("Modelo deve ser uma string não vazia.")
+            raise ValueError(
+                "Nome do modelo não pode estar vazio. "
+                "Use o formato 'provider/model-name' (ex: openai/gpt-4o-mini)."
+            )
         if "/" not in model:
-            raise ValueError("Modelo deve estar no formato 'provider/model-name'.")
+            raise ValueError(
+                f"Formato de modelo inválido: '{model}'. "
+                "Use o formato 'provider/model-name' (ex: openai/gpt-4o-mini, anthropic/claude-3-haiku)."
+            )
         logger.info("Modelo alterado para: %s", model)
         self.model = model
 
