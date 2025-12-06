@@ -270,7 +270,7 @@ class TestMain:
         mock_config_class.validate.side_effect = ConfigurationError("API key missing")
 
         with pytest.raises(SystemExit) as exc_info:
-            main()
+            main([])
 
         assert exc_info.value.code == 1
         mock_display.show_error.assert_called_once()
@@ -292,7 +292,7 @@ class TestMain:
         mock_client.__exit__ = MagicMock(return_value=False)
         mock_client_class.return_value = mock_client
 
-        main()
+        main([])
 
         mock_display.show_goodbye.assert_called_once()
 
@@ -316,7 +316,7 @@ class TestMain:
         mock_conv = MagicMock()
         mock_conv_class.return_value = mock_conv
 
-        main()
+        main([])
 
         mock_conv.add_user_message.assert_not_called()
 
@@ -348,7 +348,7 @@ class TestMain:
         mock_conv = MagicMock()
         mock_conv_class.return_value = mock_conv
 
-        main()
+        main([])
 
         mock_display.show_error.assert_called()
         mock_conv.add_user_message.assert_not_called()
@@ -385,7 +385,7 @@ class TestMain:
         mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
         mock_conv_class.return_value = mock_conv
 
-        main()
+        main([])
 
         mock_conv.remove_last_user_message.assert_called_once()
         mock_display.show_error.assert_called()

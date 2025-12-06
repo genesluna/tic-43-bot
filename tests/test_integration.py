@@ -120,7 +120,7 @@ class TestMainIntegration:
         mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
         mock_conv_class.return_value = mock_conv
 
-        main()
+        main([])
 
         mock_display.show_banner.assert_called_once()
         mock_display.show_info.assert_called()
@@ -161,7 +161,7 @@ class TestMainIntegration:
         mock_conv = MagicMock()
         mock_conv_class.return_value = mock_conv
 
-        main()
+        main([])
 
         mock_display.show_help.assert_called_once()
         mock_conv.clear.assert_called_once()

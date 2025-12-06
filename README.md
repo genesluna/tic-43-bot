@@ -63,6 +63,16 @@ cp .env.example .env
 python chatbot.py
 ```
 
+### Opções de Linha de Comando
+
+```bash
+python chatbot.py --help              # Exibe ajuda
+python chatbot.py --version           # Exibe versão
+python chatbot.py -m anthropic/claude-3.5-sonnet  # Define modelo
+python chatbot.py --log-level DEBUG   # Ativa logging detalhado
+python chatbot.py --log-file app.log  # Salva logs em arquivo
+```
+
 ### Comandos Disponíveis
 
 | Comando                                  | Descrição                         |

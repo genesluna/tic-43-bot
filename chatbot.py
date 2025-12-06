@@ -6,15 +6,51 @@ Um chatbot interativo que utiliza a API OpenRouter para
 manter conversas contextualizadas com o usuário.
 """
 
+import argparse
 import logging
+import os
 import sys
+from typing import Sequence
+
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
 from utils.logging_config import setup_logging
 
+__version__ = "1.0.0"
+
 logger = logging.getLogger(__name__)
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Processa argumentos de linha de comando."""
+    parser = argparse.ArgumentParser(
+        prog="chatbot",
+        description="Chatbot conversacional com IA via OpenRouter API",
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument(
+        "-m", "--model",
+        metavar="MODEL",
+        help="modelo de IA (ex: openai/gpt-4o-mini)",
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        metavar="LEVEL",
+        help="nível de logging (DEBUG, INFO, WARNING, ERROR)",
+    )
+    parser.add_argument(
+        "--log-file",
+        metavar="FILE",
+        help="arquivo para salvar logs",
+    )
+    return parser.parse_args(argv)
 
 
 def handle_command(
@@ -89,8 +125,15 @@ def handle_command(
     return None
 
 
-def main():
+def main(argv: Sequence[str] | None = None) -> None:
     """Loop principal do chatbot."""
+    args = parse_args(argv)
+
+    if args.log_level:
+        os.environ["LOG_LEVEL"] = args.log_level
+    if args.log_file:
+        os.environ["LOG_FILE"] = args.log_file
+
     setup_logging()
     logger.info("Iniciando chatbot")
 
@@ -104,6 +147,12 @@ def main():
         sys.exit(1)
 
     with OpenRouterClient() as client:
+        if args.model:
+            try:
+                client.set_model(args.model)
+            except ValueError as e:
+                display.show_error(str(e))
+                sys.exit(1)
         conversation = ConversationManager()
 
         display.show_banner()
