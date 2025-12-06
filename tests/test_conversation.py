@@ -160,6 +160,51 @@ class TestConversationManager:
         assert "<" not in sanitized
         assert ">" not in sanitized
 
+    def test_sanitize_filename_empty(self):
+        """String vazia deve retornar nome padrão."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("")
+        assert sanitized == "history.json"
+
+    def test_sanitize_filename_only_dots(self):
+        """String com apenas pontos deve retornar nome padrão."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("...")
+        assert sanitized == "history.json"
+
+    def test_sanitize_filename_control_chars(self):
+        """Caracteres de controle devem ser removidos."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("file\x00\x1fname.json")
+        assert "\x00" not in sanitized
+        assert "\x1f" not in sanitized
+
+    def test_save_to_file_io_error(self, tmp_path, monkeypatch):
+        """Erro de I/O deve levantar IOError."""
+        monkeypatch.chdir(tmp_path)
+
+        manager = ConversationManager()
+        manager.add_user_message("Teste")
+
+        with patch("builtins.open", side_effect=PermissionError("Acesso negado")):
+            with pytest.raises(IOError) as exc_info:
+                manager.save_to_file("test.json")
+
+            assert "Erro ao salvar" in str(exc_info.value)
+
+    def test_get_messages_returns_copy(self):
+        """get_messages deve retornar cópia, não referência."""
+        manager = ConversationManager()
+        manager.add_user_message("Teste")
+
+        messages = manager.get_messages()
+        messages.append({"role": "fake", "content": "fake"})
+
+        assert len(manager.get_messages()) == 2
+
     def test_conversation_flow(self):
         """Testa um fluxo de conversa completo."""
         manager = ConversationManager()

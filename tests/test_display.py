@@ -214,3 +214,79 @@ class TestDisplay:
         text_str = str(renderable)
         assert "42" in text_str
         assert "tokens" in text_str
+
+    def test_spinner_double_stop_is_safe(self):
+        """Parar spinner duas vezes não deve causar erro."""
+        display = Display()
+
+        display.start_spinner()
+        display.stop_spinner()
+        display.stop_spinner()
+
+        assert display.spinner.running is False
+
+    def test_spinner_thread_is_daemon(self):
+        """Thread do spinner deve ser daemon."""
+        display = Display()
+
+        display.start_spinner()
+        assert display.spinner.thread.daemon is True
+        display.stop_spinner()
+
+    def test_spinner_stop_event_is_set_on_stop(self):
+        """_stop_event deve ser setado ao parar."""
+        display = Display()
+
+        display.start_spinner()
+        assert not display.spinner._stop_event.is_set()
+
+        display.stop_spinner()
+        assert display.spinner._stop_event.is_set()
+
+    @patch("builtins.input", side_effect=KeyboardInterrupt)
+    def test_prompt_input_keyboard_interrupt(self, mock_input, capsys):
+        """KeyboardInterrupt no input deve propagar."""
+        display = Display()
+
+        with pytest.raises(KeyboardInterrupt):
+            display.prompt_input()
+
+    def test_show_bot_message_empty(self, capsys):
+        """Mensagem vazia não deve causar erro."""
+        display = Display()
+        display.show_bot_message("")
+
+        captured = capsys.readouterr()
+        assert captured.out is not None
+
+    def test_show_bot_message_with_code_block(self, capsys):
+        """Code block em markdown deve ser renderizado."""
+        display = Display()
+        display.show_bot_message("```python\nprint('hello')\n```")
+
+        captured = capsys.readouterr()
+        assert "print" in captured.out
+
+    def test_spinner_token_count_thread_safe(self):
+        """Acesso ao token_count deve ser thread-safe."""
+        from rich.console import Console
+        import threading
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+
+        results = []
+
+        def update_tokens():
+            for i in range(100):
+                spinner.update_tokens(i)
+                results.append(spinner.token_count)
+
+        threads = [threading.Thread(target=update_tokens) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(results) == 500
+        assert all(isinstance(r, int) for r in results)

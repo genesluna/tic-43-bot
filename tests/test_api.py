@@ -231,6 +231,56 @@ class TestOpenRouterClient:
 
         assert "Lista de mensagens não pode estar vazia" in str(exc_info.value)
 
+    def test_send_message_empty_messages(self):
+        """Verifica se erro é levantado quando lista de mensagens está vazia."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client.send_message([])
+
+        assert "Lista de mensagens não pode estar vazia" in str(exc_info.value)
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_null_content(self, mock_client_class):
+        """Verifica se resposta com content None é tratada."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": None}}]
+        }
+
+        mock_client = MagicMock()
+        mock_client.post.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client.send_message([{"role": "user", "content": "Olá"}])
+
+        assert "não contém conteúdo" in str(exc_info.value)
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_generic_error(self, mock_client_class):
+        """Verifica se erro 500 é tratado corretamente."""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+
+        mock_client = MagicMock()
+        mock_client.post.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client.send_message([{"role": "user", "content": "Olá"}])
+
+        assert "Erro na API (500)" in str(exc_info.value)
+
     @patch("utils.api.httpx.Client")
     def test_send_message_stream_success(self, mock_client_class):
         """Verifica se streaming funciona corretamente."""
