@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-129%20passed-brightgreen.svg)](#testes)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-165%20passed-brightgreen.svg)](#testes)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -69,8 +69,11 @@ python chatbot.py
 | `sair`, `exit`, `quit` | Encerra o chatbot |
 | `/limpar`, `/clear` | Limpa o histórico da conversa |
 | `/salvar`, `/save` | Salva o histórico em arquivo JSON |
+| `/listar`, `/list` | Lista históricos salvos |
+| `/carregar <arquivo>`, `/load <arquivo>` | Carrega histórico de arquivo |
 | `/ajuda`, `/help` | Mostra comandos disponíveis |
 | `/modelo` | Mostra o modelo atual |
+| `/modelo <nome>` | Altera o modelo de IA |
 
 ### Exemplo de Conversa
 
@@ -158,7 +161,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 129 testes com 95% de cobertura.
+O projeto possui 165 testes com 93% de cobertura.
 
 ```bash
 # Executar testes
