@@ -1,4 +1,8 @@
-# Chatbot Conversacional com IA - Projeto TIC43
+# Chatbot Conversacional com IA
+
+**Projeto de Conclusão do Curso TIC-43**
+
+Este projeto foi desenvolvido como trabalho de conclusão do curso **TIC 43 - Capacitação Tecnológica em Visão Computacional e Inteligência Artificial Generativa**, oferecido pelo [Instituto Vertex](https://www.vertex.org.br/tic-43/).
 
 Um chatbot interativo via terminal que utiliza modelos de IA generativa através da API OpenRouter para manter conversas contextualizadas.
 
@@ -157,4 +161,4 @@ chatbot-tic43/
 
 ## Licença
 
-Projeto desenvolvido para fins educacionais - TIC43.
+Projeto desenvolvido para fins educacionais como trabalho de conclusão do curso TIC-43 - Instituto Vertex.
