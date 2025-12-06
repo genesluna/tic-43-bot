@@ -1,10 +1,11 @@
 """Formatação e exibição no terminal."""
 
 import random
+# Import readline for side effect: enables line editing in input()
 import readline
 import time
 
-del readline
+del readline  # Remove from namespace after side effect
 import threading
 from datetime import datetime
 from rich.console import Console
@@ -130,7 +131,7 @@ class StreamingTextDisplay:
         self._buffer = ""
         self._lock = threading.Lock()
 
-    def _get_renderable(self):
+    def _get_renderable(self) -> Markdown | Text:
         """Retorna o texto atual como Markdown."""
         with self._lock:
             current_text = self._buffer
@@ -144,9 +145,14 @@ class StreamingTextDisplay:
         """Adiciona chunk ao buffer (thread-safe)."""
         with self._lock:
             self._buffer += chunk
+            live = self.live
+            running = self.running
 
-        if self.live and self.running:
-            self.live.update(self._get_renderable())
+        if live and running:
+            try:
+                live.update(self._get_renderable())
+            except Exception:
+                pass
 
     def get_full_text(self) -> str:
         """Retorna texto completo acumulado."""

@@ -4,7 +4,7 @@ import os
 import json
 import pytest
 from unittest.mock import patch
-from utils.conversation import ConversationManager, ConversationLoadError
+from utils.conversation import ConversationManager, ConversationLoadError, MAX_MESSAGE_CONTENT_SIZE
 
 
 class TestConversationManager:
@@ -368,6 +368,33 @@ class TestLoadFromFile:
                 manager.load_from_file("invalid_role.json")
 
             assert "role inválido" in str(exc_info.value)
+
+    def test_load_from_file_content_too_large(self, tmp_path):
+        """Mensagem muito grande deve levantar erro."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "large_content.json"
+        large_content = "x" * (MAX_MESSAGE_CONTENT_SIZE + 1)
+        test_data = {
+            "messages": [{"role": "user", "content": large_content}]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("large_content.json")
+
+            assert "tamanho máximo" in str(exc_info.value)
 
     def test_load_preserves_current_system_prompt(self, tmp_path):
         """Carregar deve usar system prompt atual, não o salvo."""

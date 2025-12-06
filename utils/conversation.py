@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from .config import config
 
+MAX_MESSAGE_CONTENT_SIZE = 100000
+
 
 class ConversationLoadError(Exception):
     """Erro ao carregar conversa de arquivo."""
@@ -209,6 +211,8 @@ class ConversationManager:
                 raise ConversationLoadError(f"Mensagem {i} sem 'role' ou 'content'")
             if msg["role"] not in ("user", "assistant"):
                 raise ConversationLoadError(f"Mensagem {i} com role inválido: {msg['role']}")
+            if len(msg.get("content", "")) > MAX_MESSAGE_CONTENT_SIZE:
+                raise ConversationLoadError(f"Mensagem {i} excede tamanho máximo")
 
         self._init_system_message()
         for msg in messages:

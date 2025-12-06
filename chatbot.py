@@ -12,8 +12,6 @@ from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
 
-CHARS_PER_TOKEN = 4
-
 
 def handle_command(
     user_input: str,
@@ -142,9 +140,15 @@ def main():
                         conversation.add_assistant_message(response)
 
                 except APIError as e:
-                    display.stop_spinner()
-                    if display.streaming.running:
-                        display.streaming.stop()
+                    try:
+                        display.stop_spinner()
+                    except Exception:
+                        pass
+                    try:
+                        if display.streaming.running:
+                            display.streaming.stop()
+                    except Exception:
+                        pass
                     display.show_error(str(e))
                     conversation.remove_last_user_message()
 
