@@ -44,6 +44,8 @@ class Config:
     SAVE_COMMANDS: tuple = ("/salvar", "/save")
     HELP_COMMANDS: tuple = ("/ajuda", "/help")
     MODEL_COMMANDS: tuple = ("/modelo",)
+    LOAD_COMMANDS: tuple = ("/carregar", "/load")
+    LIST_COMMANDS: tuple = ("/listar", "/list")
 
     MAX_MESSAGE_LENGTH: int = _get_int_env("MAX_MESSAGE_LENGTH", 10000)
     MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)

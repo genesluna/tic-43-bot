@@ -49,9 +49,18 @@ def handle_command(
         display.show_help()
         return True
 
-    if user_input_lower in config.MODEL_COMMANDS:
-        display.show_model_info(client.get_model())
-        return True
+    for cmd in config.MODEL_COMMANDS:
+        if user_input_lower.startswith(cmd):
+            arg = user_input[len(cmd):].strip()
+            if not arg:
+                display.show_model_info(client.get_model())
+            else:
+                try:
+                    client.set_model(arg)
+                    display.show_model_changed(arg)
+                except ValueError as e:
+                    display.show_error(str(e))
+            return True
 
     return None
 

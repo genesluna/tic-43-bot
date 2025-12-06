@@ -99,6 +99,15 @@ class TestDisplay:
         captured = capsys.readouterr()
         assert "openai/gpt-4o-mini" in captured.out
 
+    def test_show_model_changed(self, capsys):
+        """Verifica se mudança de modelo é exibida."""
+        display = Display()
+        display.show_model_changed("anthropic/claude-3")
+
+        captured = capsys.readouterr()
+        assert "anthropic/claude-3" in captured.out
+        assert "alterado" in captured.out.lower()
+
     def test_show_banner(self, capsys):
         """Verifica se o banner é exibido."""
         display = Display()

@@ -127,6 +127,41 @@ class TestHandleCommand:
         self.mock_client.get_model.assert_called_once()
         self.mock_display.show_model_info.assert_called_once_with("openai/gpt-4o-mini")
 
+    def test_model_command_with_argument(self):
+        """Verifica se '/modelo provider/model' troca o modelo."""
+        result = handle_command(
+            "/modelo openai/gpt-4",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_client.set_model.assert_called_once_with("openai/gpt-4")
+        self.mock_display.show_model_changed.assert_called_once_with("openai/gpt-4")
+
+    def test_model_command_with_invalid_argument(self):
+        """Verifica se modelo inválido mostra erro."""
+        self.mock_client.set_model.side_effect = ValueError("Modelo deve estar no formato 'provider/model-name'.")
+        result = handle_command(
+            "/modelo invalid-model",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_display.show_error.assert_called_once()
+
+    def test_model_command_preserves_argument_case(self):
+        """Verifica se o argumento do modelo preserva maiúsculas/minúsculas."""
+        result = handle_command(
+            "/modelo OpenAI/GPT-4o-Mini",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_client.set_model.assert_called_once_with("OpenAI/GPT-4o-Mini")
+
     def test_regular_message_returns_none(self):
         """Verifica se mensagem normal retorna None."""
         result = handle_command(

@@ -152,7 +152,7 @@ class Display:
             ("/limpar, /clear", "Limpa o histórico da conversa"),
             ("/salvar, /save", "Salva o histórico em arquivo"),
             ("/ajuda, /help", "Mostra esta mensagem"),
-            ("/modelo", "Mostra o modelo atual"),
+            ("/modelo [nome]", "Mostra ou altera o modelo atual"),
         ]
         for cmd, desc in commands:
             self.console.print(f"  [bold cyan]{cmd:<20}[/bold cyan] [dim]{desc}[/dim]")
@@ -198,6 +198,10 @@ class Display:
     def show_model_info(self, model: str) -> None:
         """Exibe informação sobre o modelo atual."""
         self.console.print(f"\n[dim]Modelo:[/dim] [cyan]{model}[/cyan]\n")
+
+    def show_model_changed(self, model: str) -> None:
+        """Exibe confirmação de troca de modelo."""
+        self.console.print(f"[bold green]✓[/bold green] Modelo alterado para: [cyan]{model}[/cyan]")
 
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""
