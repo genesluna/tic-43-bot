@@ -389,3 +389,128 @@ class TestMain:
 
         mock_conv.remove_last_user_message.assert_called_once()
         mock_display.show_error.assert_called()
+
+
+class TestParseArgs:
+    """Testes para a função parse_args."""
+
+    def test_parse_args_no_arguments(self):
+        """Verifica parsing sem argumentos."""
+        from chatbot import parse_args
+
+        args = parse_args([])
+
+        assert args.model is None
+        assert args.log_level is None
+        assert args.log_file is None
+
+    def test_parse_args_model_short(self):
+        """Verifica parsing do argumento -m."""
+        from chatbot import parse_args
+
+        args = parse_args(["-m", "anthropic/claude-3.5-sonnet"])
+
+        assert args.model == "anthropic/claude-3.5-sonnet"
+
+    def test_parse_args_model_long(self):
+        """Verifica parsing do argumento --model."""
+        from chatbot import parse_args
+
+        args = parse_args(["--model", "openai/gpt-4o"])
+
+        assert args.model == "openai/gpt-4o"
+
+    def test_parse_args_log_level(self):
+        """Verifica parsing do argumento --log-level."""
+        from chatbot import parse_args
+
+        args = parse_args(["--log-level", "DEBUG"])
+
+        assert args.log_level == "DEBUG"
+
+    def test_parse_args_log_file(self):
+        """Verifica parsing do argumento --log-file."""
+        from chatbot import parse_args
+
+        args = parse_args(["--log-file", "/tmp/app.log"])
+
+        assert args.log_file == "/tmp/app.log"
+
+    def test_parse_args_all_options(self):
+        """Verifica parsing de todos os argumentos combinados."""
+        from chatbot import parse_args
+
+        args = parse_args([
+            "-m", "openai/gpt-4o",
+            "--log-level", "INFO",
+            "--log-file", "app.log"
+        ])
+
+        assert args.model == "openai/gpt-4o"
+        assert args.log_level == "INFO"
+        assert args.log_file == "app.log"
+
+    def test_parse_args_version(self):
+        """Verifica que --version causa SystemExit."""
+        from chatbot import parse_args
+
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["--version"])
+
+        assert exc_info.value.code == 0
+
+    def test_parse_args_invalid_log_level(self):
+        """Verifica que log level inválido causa erro."""
+        from chatbot import parse_args
+
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["--log-level", "INVALID"])
+
+        assert exc_info.value.code != 0
+
+
+class TestMainWithArgs:
+    """Testes para main() com argumentos de linha de comando."""
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_with_model_arg(
+        self, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica que -m define o modelo corretamente."""
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client_class.return_value = mock_client
+
+        main(["-m", "anthropic/claude-3.5-sonnet"])
+
+        mock_client.set_model.assert_called_once_with("anthropic/claude-3.5-sonnet")
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    def test_main_with_invalid_model_exits(
+        self, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica que modelo inválido causa exit."""
+        mock_display = MagicMock()
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.set_model.side_effect = ValueError("Invalid model")
+        mock_client_class.return_value = mock_client
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-m", "invalid"])
+
+        assert exc_info.value.code == 1
+        mock_display.show_error.assert_called()

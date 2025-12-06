@@ -514,3 +514,166 @@ class TestListHistoryFiles:
 
             assert len(files) == 1
             assert files[0][0] == "valid.json"
+
+
+class TestUnicodeAndLargeMessages:
+    """Testes para mensagens Unicode e mensagens grandes."""
+
+    @patch("utils.conversation.config")
+    def test_unicode_message_content(self, mock_config):
+        """Verifica que mensagens com Unicode são tratadas corretamente."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        unicode_message = "Olá! 你好! مرحبا! שלום! 🎉🚀💻"
+        manager.add_user_message(unicode_message)
+
+        messages = manager.get_messages()
+        assert messages[-1]["content"] == unicode_message
+
+    @patch("utils.conversation.config")
+    def test_emoji_message(self, mock_config):
+        """Verifica que mensagens com emojis são tratadas corretamente."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        emoji_message = "Hello 👋 World 🌍! How are you? 🤔💭"
+        manager.add_user_message(emoji_message)
+        manager.add_assistant_message("I'm fine! 😊")
+
+        messages = manager.get_messages()
+        assert messages[-2]["content"] == emoji_message
+        assert messages[-1]["content"] == "I'm fine! 😊"
+
+    @patch("utils.conversation.config")
+    def test_large_message_within_limit(self, mock_config):
+        """Verifica que mensagem grande dentro do limite é aceita."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        large_message = "A" * 50000
+        manager.add_user_message(large_message)
+
+        messages = manager.get_messages()
+        assert len(messages[-1]["content"]) == 50000
+
+    @patch("utils.conversation.config")
+    def test_multiline_message(self, mock_config):
+        """Verifica que mensagens multilinha são tratadas corretamente."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        multiline = """Linha 1
+        Linha 2
+        Linha 3
+
+        Linha com espaço acima"""
+        manager.add_user_message(multiline)
+
+        messages = manager.get_messages()
+        assert messages[-1]["content"] == multiline
+        assert messages[-1]["content"].count("\n") == 4
+
+    @patch("utils.conversation.config")
+    def test_special_characters_message(self, mock_config):
+        """Verifica que caracteres especiais são tratados corretamente."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        special = '<script>alert("XSS")</script> & "quotes" \'single\' `backticks`'
+        manager.add_user_message(special)
+
+        messages = manager.get_messages()
+        assert messages[-1]["content"] == special
+
+    @patch("utils.conversation.config")
+    def test_load_file_with_large_message_at_limit(self, mock_config, tmp_path):
+        """Verifica carregamento de arquivo com mensagem no limite."""
+        from utils.conversation import MAX_MESSAGE_CONTENT_SIZE
+
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+        mock_config.HISTORY_DIR = str(tmp_path)
+
+        large_content = "X" * (MAX_MESSAGE_CONTENT_SIZE - 1)
+        history_data = {
+            "timestamp": "2024-01-01T00:00:00",
+            "model": "test",
+            "messages": [{"role": "user", "content": large_content}]
+        }
+
+        history_file = tmp_path / "large.json"
+        import json
+        with open(history_file, "w") as f:
+            json.dump(history_data, f)
+
+        manager = ConversationManager()
+        count = manager.load_from_file("large.json")
+
+        assert count == 1
+
+    @patch("utils.conversation.config")
+    def test_load_file_with_message_exceeding_limit(self, mock_config, tmp_path):
+        """Verifica erro ao carregar mensagem que excede limite."""
+        from utils.conversation import MAX_MESSAGE_CONTENT_SIZE, ConversationLoadError
+
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+        mock_config.HISTORY_DIR = str(tmp_path)
+
+        too_large_content = "X" * (MAX_MESSAGE_CONTENT_SIZE + 1)
+        history_data = {
+            "timestamp": "2024-01-01T00:00:00",
+            "model": "test",
+            "messages": [{"role": "user", "content": too_large_content}]
+        }
+
+        history_file = tmp_path / "too_large.json"
+        import json
+        with open(history_file, "w") as f:
+            json.dump(history_data, f)
+
+        manager = ConversationManager()
+
+        with pytest.raises(ConversationLoadError) as exc_info:
+            manager.load_from_file("too_large.json")
+
+        assert "tamanho máximo" in str(exc_info.value)

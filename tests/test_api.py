@@ -547,3 +547,121 @@ class TestRetrySuccess:
         assert result == "Resposta após erro de conexão"
         assert mock_sleep.call_count == 1
         assert mock_client.post.call_count == 2
+
+
+class TestOpenRouterClientClose:
+    """Testes para o método close()."""
+
+    @patch("utils.api.httpx.Client")
+    def test_close_closes_client(self, mock_client_class):
+        """Verifica que close() fecha o cliente HTTP."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+        _ = client._get_client()
+
+        client.close()
+
+        mock_client.close.assert_called_once()
+        assert client._client is None
+
+    def test_close_without_client(self):
+        """Verifica que close() sem cliente não causa erro."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        client.close()
+
+        assert client._client is None
+
+    @patch("utils.api.httpx.Client")
+    def test_close_multiple_times(self, mock_client_class):
+        """Verifica que close() pode ser chamado múltiplas vezes."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+        _ = client._get_client()
+
+        client.close()
+        client.close()
+
+        mock_client.close.assert_called_once()
+
+
+class TestMessageValidation:
+    """Testes para validação de mensagens."""
+
+    def test_validate_messages_empty_list(self):
+        """Verifica erro com lista vazia."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([])
+
+        assert "vazia" in str(exc_info.value)
+
+    def test_validate_messages_invalid_type(self):
+        """Verifica erro com item que não é dicionário."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages(["not a dict"])
+
+        assert "dicionário" in str(exc_info.value)
+
+    def test_validate_messages_missing_role(self):
+        """Verifica erro quando falta campo role."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([{"content": "test"}])
+
+        assert "role" in str(exc_info.value)
+
+    def test_validate_messages_missing_content(self):
+        """Verifica erro quando falta campo content."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([{"role": "user"}])
+
+        assert "content" in str(exc_info.value)
+
+    def test_validate_messages_invalid_role(self):
+        """Verifica erro com role inválido."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([{"role": "invalid", "content": "test"}])
+
+        assert "inválido" in str(exc_info.value)
+
+    def test_validate_messages_non_string_content(self):
+        """Verifica erro com content não-string."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([{"role": "user", "content": 123}])
+
+        assert "não-string" in str(exc_info.value)
+
+    def test_validate_messages_valid(self):
+        """Verifica que mensagens válidas passam."""
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        client._validate_messages([
+            {"role": "system", "content": "You are helpful"},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"},
+        ])

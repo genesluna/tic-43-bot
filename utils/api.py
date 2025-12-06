@@ -130,6 +130,24 @@ class OpenRouterClient:
             time.sleep(backoff)
         return retry_after, should_retry
 
+    def _validate_messages(self, messages: list[dict[str, str]]) -> None:
+        """Valida estrutura das mensagens antes de enviar à API."""
+        if not messages:
+            raise APIError("Lista de mensagens não pode estar vazia.")
+
+        valid_roles = {"system", "user", "assistant"}
+        for i, msg in enumerate(messages):
+            if not isinstance(msg, dict):
+                raise APIError(f"Mensagem {i} deve ser um dicionário.")
+            if "role" not in msg:
+                raise APIError(f"Mensagem {i} não contém campo 'role'.")
+            if "content" not in msg:
+                raise APIError(f"Mensagem {i} não contém campo 'content'.")
+            if msg["role"] not in valid_roles:
+                raise APIError(f"Mensagem {i} tem role inválido: {msg['role']}")
+            if not isinstance(msg["content"], str):
+                raise APIError(f"Mensagem {i} tem content não-string.")
+
     def send_message(self, messages: list[dict[str, str]]) -> str:
         """
         Envia mensagens para a API e retorna a resposta.
@@ -149,8 +167,7 @@ class OpenRouterClient:
                 "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
             )
 
-        if not messages:
-            raise APIError("Lista de mensagens não pode estar vazia.")
+        self._validate_messages(messages)
 
         payload = {
             "model": self.model,
@@ -232,8 +249,7 @@ class OpenRouterClient:
                 "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
             )
 
-        if not messages:
-            raise APIError("Lista de mensagens não pode estar vazia.")
+        self._validate_messages(messages)
 
         payload = {
             "model": self.model,

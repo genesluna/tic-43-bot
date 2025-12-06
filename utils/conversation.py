@@ -6,11 +6,20 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
+
 from .config import config
 
 logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_CONTENT_SIZE = 100000
+
+
+class Message(TypedDict):
+    """Estrutura de uma mensagem no formato OpenAI."""
+
+    role: str
+    content: str
 
 
 class ConversationLoadError(Exception):
@@ -20,8 +29,8 @@ class ConversationLoadError(Exception):
 class ConversationManager:
     """Gerencia o histórico de mensagens da conversa."""
 
-    def __init__(self):
-        self.messages: list[dict] = []
+    def __init__(self) -> None:
+        self.messages: list[Message] = []
         self.system_prompt = self._build_system_prompt()
         self._init_system_message()
 
@@ -82,7 +91,7 @@ class ConversationManager:
                 return removed["content"]
         return None
 
-    def get_messages(self) -> list[dict]:
+    def get_messages(self) -> list[Message]:
         """Retorna uma cópia de todas as mensagens."""
         return self.messages.copy()
 
@@ -90,7 +99,7 @@ class ConversationManager:
         """Limpa o histórico, mantendo apenas o system prompt."""
         self._init_system_message()
 
-    def get_history_for_display(self) -> list[dict]:
+    def get_history_for_display(self) -> list[Message]:
         """Retorna o histórico sem a mensagem de sistema."""
         return [msg for msg in self.messages if msg["role"] != "system"]
 

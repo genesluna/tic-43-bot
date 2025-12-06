@@ -204,13 +204,13 @@ def main(argv: Sequence[str] | None = None) -> None:
                     logger.error(f"Erro na API: {e}")
                     try:
                         display.stop_spinner()
-                    except Exception:
-                        pass
+                    except RuntimeError as stop_err:
+                        logger.debug(f"Erro ao parar spinner: {stop_err}")
                     try:
                         if display.streaming.running:
                             display.streaming.stop()
-                    except Exception:
-                        pass
+                    except RuntimeError as stream_err:
+                        logger.debug(f"Erro ao parar streaming: {stream_err}")
                     display.show_error(str(e))
                     conversation.remove_last_user_message()
 

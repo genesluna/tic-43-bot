@@ -2,10 +2,10 @@
 
 import logging
 import random
-import readline
+import readline  # noqa: F401 - imported for side effect (enables input history/editing)
 import time
 
-del readline
+del readline  # Remove from namespace
 import threading
 from datetime import datetime
 from rich.console import Console
@@ -15,6 +15,11 @@ from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
+SPINNER_REFRESH_RATE = 12
+STREAMING_REFRESH_RATE = 10
+WORD_CHANGE_INTERVAL = 5.0
+ANIMATION_FRAME_INTERVAL = 0.08
+THREAD_JOIN_TIMEOUT = 0.2
 
 THINKING_WORDS: list[str] = [
     "Pensando",
@@ -47,7 +52,7 @@ class RotatingSpinner:
         self.spinner_chars: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
         self.char_index: int = 0
         self.word_index: int = 0
-        self.word_change_interval: float = 5.0
+        self.word_change_interval: float = WORD_CHANGE_INTERVAL
         self.last_word_change: float = 0
         self.start_time: float = 0
         self._token_count: int = 0
@@ -90,7 +95,7 @@ class RotatingSpinner:
 
     def _animate(self) -> None:
         self.last_word_change = time.time()
-        while not self._stop_event.wait(timeout=0.08):
+        while not self._stop_event.wait(timeout=ANIMATION_FRAME_INTERVAL):
             if time.time() - self.last_word_change >= self.word_change_interval:
                 self.word_index = (self.word_index + 1) % len(THINKING_WORDS)
                 self.last_word_change = time.time()
@@ -108,7 +113,7 @@ class RotatingSpinner:
         with self._lock:
             self._token_count = 0
         self.word_index = random.randint(0, len(THINKING_WORDS) - 1)
-        self.live = Live(self._get_renderable(), console=self.console, transient=True, refresh_per_second=12)
+        self.live = Live(self._get_renderable(), console=self.console, transient=True, refresh_per_second=SPINNER_REFRESH_RATE)
         self.live.start()
         self.thread = threading.Thread(target=self._animate, daemon=True)
         self.thread.start()
@@ -116,10 +121,10 @@ class RotatingSpinner:
 
     def stop(self) -> None:
         """Para o spinner. Seguro para chamadas múltiplas."""
-        self.running = False
         self._stop_event.set()
         if self.thread:
-            self.thread.join(timeout=0.2)
+            self.thread.join(timeout=THREAD_JOIN_TIMEOUT)
+        self.running = False
         if self.live:
             self.live.stop()
         elapsed = time.time() - self.start_time if self.start_time else 0
@@ -150,14 +155,14 @@ class StreamingTextDisplay:
         """Adiciona chunk ao buffer (thread-safe)."""
         with self._lock:
             self._buffer += chunk
+            if not self.running or self.live is None:
+                return
             live = self.live
-            running = self.running
 
-        if live and running:
-            try:
-                live.update(self._get_renderable())
-            except Exception:
-                pass
+        try:
+            live.update(self._get_renderable())
+        except Exception as e:
+            logger.debug(f"Falha ao atualizar display: {e}")
 
     def get_full_text(self) -> str:
         """Retorna texto completo acumulado."""
@@ -177,7 +182,7 @@ class StreamingTextDisplay:
         self.live = Live(
             self._get_renderable(),
             console=self.console,
-            refresh_per_second=10,
+            refresh_per_second=STREAMING_REFRESH_RATE,
             vertical_overflow="visible",
         )
         self.live.start()
