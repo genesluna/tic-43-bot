@@ -227,7 +227,8 @@ class OpenRouterClient:
         return self.model
 
     def close(self) -> None:
-        """Fecha o cliente HTTP."""
-        if self._client:
-            self._client.close()
-            self._client = None
+        """Fecha o cliente HTTP (thread-safe)."""
+        with self._client_lock:
+            if self._client:
+                self._client.close()
+                self._client = None

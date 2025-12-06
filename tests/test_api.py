@@ -82,7 +82,7 @@ class TestOpenRouterClient:
             mock_config.OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
             client = OpenRouterClient()
-            client.api_key = ""
+            client._api_key = ""
 
             with pytest.raises(APIError) as exc_info:
                 client.send_message([{"role": "user", "content": "Olá"}])
@@ -105,7 +105,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         response = client.send_message([{"role": "user", "content": "Olá"}])
 
@@ -125,7 +125,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "invalid_key"
+        client._api_key = "invalid_key"
 
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
@@ -146,7 +146,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
@@ -163,7 +163,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
@@ -180,7 +180,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
@@ -199,7 +199,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
@@ -214,7 +214,7 @@ class TestOpenRouterClient:
             mock_config.OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
             client = OpenRouterClient()
-            client.api_key = ""
+            client._api_key = ""
 
             with pytest.raises(APIError) as exc_info:
                 list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
@@ -224,7 +224,7 @@ class TestOpenRouterClient:
     def test_send_message_stream_empty_messages(self):
         """Verifica se erro é levantado quando lista de mensagens está vazia."""
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         with pytest.raises(APIError) as exc_info:
             list(client.send_message_stream([]))
@@ -253,7 +253,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "test_key"
+        client._api_key = "test_key"
 
         chunks = list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
 
@@ -274,7 +274,7 @@ class TestOpenRouterClient:
         mock_client_class.return_value = mock_client
 
         client = OpenRouterClient()
-        client.api_key = "invalid_key"
+        client._api_key = "invalid_key"
 
         with pytest.raises(APIError) as exc_info:
             list(client.send_message_stream([{"role": "user", "content": "Olá"}]))

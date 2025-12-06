@@ -10,6 +10,15 @@ class ConfigurationError(Exception):
     """Erro de configuração do chatbot."""
 
 
+def _get_int_env(name: str, default: int) -> int:
+    """Obtém variável de ambiente como inteiro com validação."""
+    value = os.getenv(name, str(default))
+    try:
+        return int(value)
+    except ValueError:
+        raise ConfigurationError(f"{name} deve ser um número inteiro, recebido: '{value}'")
+
+
 class Config:
     """Classe de configuração do chatbot."""
 
@@ -33,8 +42,8 @@ class Config:
     HELP_COMMANDS: tuple = ("/ajuda", "/help")
     MODEL_COMMANDS: tuple = ("/modelo",)
 
-    MAX_MESSAGE_LENGTH: int = int(os.getenv("MAX_MESSAGE_LENGTH", "10000"))
-    MAX_HISTORY_SIZE: int = int(os.getenv("MAX_HISTORY_SIZE", "50"))
+    MAX_MESSAGE_LENGTH: int = _get_int_env("MAX_MESSAGE_LENGTH", 10000)
+    MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)
 
     @classmethod
     def validate(cls) -> None:
