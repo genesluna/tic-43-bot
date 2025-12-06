@@ -106,7 +106,7 @@ class TestDisplay:
 
         captured = capsys.readouterr()
         assert "Chatbot Conversacional" in captured.out
-        assert "OpenRouter" in captured.out
+        assert "Vertex" in captured.out
 
     def test_show_help(self, capsys):
         """Verifica se a ajuda é exibida."""

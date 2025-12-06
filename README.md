@@ -83,7 +83,7 @@ python chatbot.py
        ╚═╝   ╚═╝ ╚═════╝    ╚═════╝  ╚═════╝    ╚═╝            ╚═╝╚═════╝
 
     > Chatbot Conversacional com IA Generativa
-    > Powered by OpenRouter
+    > Powered by Vertex
 
 > Olá! Me explique o que é machine learning.
 

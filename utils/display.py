@@ -134,7 +134,7 @@ class Display:
        ╚═╝   ╚═╝ ╚═════╝    ╚═════╝  ╚═════╝    ╚═╝            ╚═╝╚═════╝[/bold cyan]
 
     [bold magenta]>[/bold magenta] [bold white]Chatbot Conversacional com IA Generativa[/bold white]
-    [bold yellow]>[/bold yellow] [italic]Powered by OpenRouter[/italic]
+    [bold yellow]>[/bold yellow] [italic]Powered by Vertex[/italic]
 """
         self.console.print(logo)
         self.console.print()
