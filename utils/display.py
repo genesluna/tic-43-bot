@@ -1,11 +1,10 @@
 """Formatação e exibição no terminal."""
 
 import random
-# Import readline for side effect: enables line editing in input()
 import readline
 import time
 
-del readline  # Remove from namespace after side effect
+del readline
 import threading
 from datetime import datetime
 from rich.console import Console
