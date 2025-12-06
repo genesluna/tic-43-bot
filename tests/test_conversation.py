@@ -142,24 +142,20 @@ class TestConversationManager:
 
         manager = ConversationManager()
 
-        # Adiciona mensagens além do limite
         for i in range(config.MAX_HISTORY_SIZE + 10):
             manager.add_user_message(f"Mensagem {i}")
             manager.add_assistant_message(f"Resposta {i}")
 
-        # Deve ter no máximo MAX_HISTORY_SIZE mensagens + system prompt
         assert len(manager.messages) <= config.MAX_HISTORY_SIZE + 1
 
     def test_sanitize_filename(self):
         """Verifica se nomes de arquivo são sanitizados."""
         manager = ConversationManager()
 
-        # Path traversal deve ser sanitizado
         sanitized = manager._sanitize_filename("../../../etc/passwd")
         assert ".." not in sanitized
         assert "/" not in sanitized
 
-        # Caracteres especiais devem ser removidos
         sanitized = manager._sanitize_filename('file<>:"/\\|?*.json')
         assert "<" not in sanitized
         assert ">" not in sanitized
@@ -168,7 +164,6 @@ class TestConversationManager:
         """Testa um fluxo de conversa completo."""
         manager = ConversationManager()
 
-        # Simula uma conversa
         manager.add_user_message("Olá!")
         manager.add_assistant_message("Olá! Como posso ajudar?")
         manager.add_user_message("Qual é a capital do Brasil?")
@@ -177,8 +172,7 @@ class TestConversationManager:
         assert manager.message_count() == 4
 
         messages = manager.get_messages()
-        assert len(messages) == 5  # 4 + system
+        assert len(messages) == 5
 
-        # Limpa e verifica
         manager.clear()
         assert manager.message_count() == 0

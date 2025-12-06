@@ -1,9 +1,9 @@
 """Formatação e exibição no terminal."""
 
 try:
-    import readline  # Habilita navegação com setas e histórico (Unix)
+    import readline
 except ImportError:
-    pass  # Windows não tem readline, mas funciona sem ele
+    pass
 
 import random
 import time
@@ -157,7 +157,7 @@ class Display:
 
     def show_user_message(self, message: str) -> None:
         """Exibe uma mensagem do usuário."""
-        pass  # Não precisamos exibir novamente, já foi digitado
+        pass
 
     def show_bot_message(self, message: str) -> None:
         """Exibe uma resposta do bot com suporte a Markdown."""

@@ -58,7 +58,6 @@ def main():
     """Loop principal do chatbot."""
     display = Display()
 
-    # Valida configuração antes de iniciar
     try:
         Config.validate()
     except ConfigurationError as e:
@@ -80,7 +79,6 @@ def main():
                 if not user_input.strip():
                     continue
 
-                # Valida tamanho da mensagem
                 if len(user_input) > config.MAX_MESSAGE_LENGTH:
                     display.show_error(
                         f"Mensagem muito longa (máximo {config.MAX_MESSAGE_LENGTH} caracteres)."

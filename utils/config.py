@@ -30,7 +30,6 @@ class Config:
     HELP_COMMANDS: tuple = ("/ajuda", "/help")
     MODEL_COMMANDS: tuple = ("/modelo",)
 
-    # Limites
     MAX_MESSAGE_LENGTH: int = 10000
     MAX_HISTORY_SIZE: int = 50
 

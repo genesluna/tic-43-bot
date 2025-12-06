@@ -184,7 +184,7 @@ class OpenRouterClient:
                     if not line or not line.startswith("data: "):
                         continue
 
-                    data_str = line[6:]  # Remove "data: " prefix
+                    data_str = line[6:]
 
                     if data_str == "[DONE]":
                         break

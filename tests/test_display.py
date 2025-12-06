@@ -150,7 +150,6 @@ class TestDisplay:
         display.show_bot_message("**Texto em negrito**")
 
         captured = capsys.readouterr()
-        # O markdown é renderizado, então o texto deve estar presente
         assert "Texto em negrito" in captured.out
 
     @patch("builtins.input", return_value="teste de input")
@@ -212,8 +211,6 @@ class TestDisplay:
         spinner.update_tokens(42)
 
         renderable = spinner._get_renderable()
-
-        # Converte para string para verificar
         text_str = str(renderable)
         assert "42" in text_str
         assert "tokens" in text_str
