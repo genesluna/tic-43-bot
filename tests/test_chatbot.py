@@ -162,6 +162,68 @@ class TestHandleCommand:
         assert result is True
         self.mock_client.set_model.assert_called_once_with("OpenAI/GPT-4o-Mini")
 
+    def test_list_command(self):
+        """Verifica se '/listar' mostra arquivos de histórico."""
+        self.mock_conversation.list_history_files.return_value = []
+        result = handle_command(
+            "/listar",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_conversation.list_history_files.assert_called_once()
+        self.mock_display.show_history_list.assert_called_once_with([])
+
+    def test_list_command_english(self):
+        """Verifica se '/list' mostra arquivos de histórico."""
+        self.mock_conversation.list_history_files.return_value = []
+        result = handle_command(
+            "/list",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_display.show_history_list.assert_called_once()
+
+    def test_load_command_with_file(self):
+        """Verifica se '/carregar arquivo' carrega histórico."""
+        self.mock_conversation.load_from_file.return_value = 5
+        result = handle_command(
+            "/carregar test.json",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_conversation.load_from_file.assert_called_once_with("test.json")
+        self.mock_display.show_success.assert_called_once()
+
+    def test_load_command_without_file(self):
+        """Verifica se '/carregar' sem arquivo mostra erro."""
+        result = handle_command(
+            "/carregar",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_display.show_error.assert_called_once()
+
+    def test_load_command_with_error(self):
+        """Verifica se erro ao carregar é tratado."""
+        from utils.conversation import ConversationLoadError
+        self.mock_conversation.load_from_file.side_effect = ConversationLoadError("Arquivo não encontrado")
+        result = handle_command(
+            "/carregar nonexistent.json",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result is True
+        self.mock_display.show_error.assert_called_once()
+
     def test_regular_message_returns_none(self):
         """Verifica se mensagem normal retorna None."""
         result = handle_command(

@@ -108,6 +108,29 @@ class TestDisplay:
         assert "anthropic/claude-3" in captured.out
         assert "alterado" in captured.out.lower()
 
+    def test_show_history_list_empty(self, capsys):
+        """Verifica se lista vazia mostra mensagem apropriada."""
+        display = Display()
+        display.show_history_list([])
+
+        captured = capsys.readouterr()
+        assert "Nenhum arquivo" in captured.out
+
+    def test_show_history_list_with_files(self, capsys):
+        """Verifica se lista de arquivos é exibida."""
+        display = Display()
+        files = [
+            ("history_1.json", "2024-01-15T10:30:00", "openai/gpt-4"),
+            ("history_2.json", "2024-01-14T09:00:00", "anthropic/claude-3"),
+        ]
+        display.show_history_list(files)
+
+        captured = capsys.readouterr()
+        assert "history_1.json" in captured.out
+        assert "history_2.json" in captured.out
+        assert "openai/gpt-4" in captured.out
+        assert "/carregar" in captured.out
+
     def test_show_banner(self, capsys):
         """Verifica se o banner é exibido."""
         display = Display()

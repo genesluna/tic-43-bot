@@ -6,6 +6,7 @@ import time
 
 del readline
 import threading
+from datetime import datetime
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
@@ -151,6 +152,8 @@ class Display:
             ("sair, exit, quit", "Encerra o chatbot"),
             ("/limpar, /clear", "Limpa o histórico da conversa"),
             ("/salvar, /save", "Salva o histórico em arquivo"),
+            ("/listar, /list", "Lista históricos salvos"),
+            ("/carregar, /load", "Carrega histórico de arquivo"),
             ("/ajuda, /help", "Mostra esta mensagem"),
             ("/modelo [nome]", "Mostra ou altera o modelo atual"),
         ]
@@ -202,6 +205,31 @@ class Display:
     def show_model_changed(self, model: str) -> None:
         """Exibe confirmação de troca de modelo."""
         self.console.print(f"[bold green]✓[/bold green] Modelo alterado para: [cyan]{model}[/cyan]")
+
+    def show_history_list(self, files: list[tuple[str, str, str]]) -> None:
+        """Exibe lista de arquivos de histórico disponíveis."""
+        self.console.print()
+        if not files:
+            self.console.print("[dim]Nenhum arquivo de histórico encontrado.[/dim]")
+            self.console.print()
+            return
+
+        self.console.print("[bold dim]Arquivos de histórico disponíveis:[/bold dim]")
+        self.console.print()
+        for filename, timestamp, model in files:
+            try:
+                dt = datetime.fromisoformat(timestamp)
+                formatted_time = dt.strftime("%d/%m/%Y %H:%M")
+            except ValueError:
+                formatted_time = timestamp
+            self.console.print(
+                f"  [cyan]{filename:<30}[/cyan] "
+                f"[dim]{formatted_time}[/dim] "
+                f"[dim]({model})[/dim]"
+            )
+        self.console.print()
+        self.console.print("[dim]Use /carregar <nome_arquivo> para carregar.[/dim]")
+        self.console.print()
 
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""

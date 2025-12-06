@@ -2,7 +2,7 @@
 
 from .config import config, Config, ConfigurationError
 from .api import OpenRouterClient, APIError, RateLimitError
-from .conversation import ConversationManager
+from .conversation import ConversationManager, ConversationLoadError
 from .display import Display
 
 __all__ = [
@@ -13,5 +13,6 @@ __all__ = [
     "APIError",
     "RateLimitError",
     "ConversationManager",
+    "ConversationLoadError",
     "Display",
 ]

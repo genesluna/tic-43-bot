@@ -4,7 +4,7 @@ import os
 import json
 import pytest
 from unittest.mock import patch
-from utils.conversation import ConversationManager
+from utils.conversation import ConversationManager, ConversationLoadError
 
 
 class TestConversationManager:
@@ -244,3 +244,246 @@ class TestConversationManager:
             assert str(custom_dir) in saved_path
             assert custom_dir.exists()
             assert (custom_dir / "test.json").exists()
+
+
+class TestLoadFromFile:
+    """Testes para carregamento de histórico."""
+
+    def test_load_from_file_success(self, tmp_path):
+        """Verifica se histórico é carregado corretamente."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "test.json"
+        test_data = {
+            "timestamp": "2024-01-01T12:00:00",
+            "model": "openai/gpt-4",
+            "messages": [
+                {"role": "user", "content": "Olá"},
+                {"role": "assistant", "content": "Oi!"}
+            ]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            count = manager.load_from_file("test.json")
+
+            assert count == 2
+            assert manager.message_count() == 2
+
+    def test_load_from_file_not_found(self, tmp_path):
+        """Arquivo inexistente deve levantar ConversationLoadError."""
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(tmp_path)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("nonexistent.json")
+
+            assert "não encontrado" in str(exc_info.value)
+
+    def test_load_from_file_invalid_json(self, tmp_path):
+        """JSON inválido deve levantar ConversationLoadError."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "invalid.json"
+        test_file.write_text("{ invalid json }", encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("invalid.json")
+
+            assert "JSON inválido" in str(exc_info.value)
+
+    def test_load_from_file_missing_messages(self, tmp_path):
+        """Arquivo sem 'messages' deve levantar erro."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "no_messages.json"
+        test_file.write_text('{"timestamp": "2024-01-01"}', encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("no_messages.json")
+
+            assert "messages" in str(exc_info.value)
+
+    def test_load_from_file_invalid_role(self, tmp_path):
+        """Role inválido deve levantar erro."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "invalid_role.json"
+        test_data = {
+            "messages": [{"role": "system", "content": "test"}]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("invalid_role.json")
+
+            assert "role inválido" in str(exc_info.value)
+
+    def test_load_preserves_current_system_prompt(self, tmp_path):
+        """Carregar deve usar system prompt atual, não o salvo."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "test.json"
+        test_data = {
+            "timestamp": "2024-01-01T12:00:00",
+            "model": "old-model",
+            "messages": [{"role": "user", "content": "Olá"}]
+        }
+        test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "NOVO PROMPT"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            manager.load_from_file("test.json")
+
+            messages = manager.get_messages()
+            assert messages[0]["role"] == "system"
+            assert "NOVO PROMPT" in messages[0]["content"]
+
+
+class TestListHistoryFiles:
+    """Testes para listagem de arquivos."""
+
+    def test_list_empty_directory(self, tmp_path):
+        """Diretório vazio deve retornar lista vazia."""
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(tmp_path)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            files = manager.list_history_files()
+
+            assert files == []
+
+    def test_list_nonexistent_directory(self, tmp_path):
+        """Diretório inexistente deve retornar lista vazia."""
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(tmp_path / "nonexistent")
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            files = manager.list_history_files()
+
+            assert files == []
+
+    def test_list_with_files(self, tmp_path):
+        """Deve listar arquivos JSON válidos."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+
+        for i in range(3):
+            test_file = history_dir / f"history_{i}.json"
+            test_data = {
+                "timestamp": f"2024-01-0{i+1}T12:00:00",
+                "model": f"model-{i}",
+                "messages": []
+            }
+            test_file.write_text(json.dumps(test_data), encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            files = manager.list_history_files()
+
+            assert len(files) == 3
+            assert files[0][1] == "2024-01-03T12:00:00"
+
+    def test_list_ignores_invalid_json(self, tmp_path):
+        """Arquivos JSON inválidos devem ser ignorados."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+
+        valid_file = history_dir / "valid.json"
+        valid_file.write_text('{"timestamp": "2024-01-01", "model": "test", "messages": []}')
+
+        invalid_file = history_dir / "invalid.json"
+        invalid_file.write_text("not json")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            files = manager.list_history_files()
+
+            assert len(files) == 1
+            assert files[0][0] == "valid.json"

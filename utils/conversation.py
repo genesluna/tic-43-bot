@@ -8,6 +8,10 @@ from pathlib import Path
 from .config import config
 
 
+class ConversationLoadError(Exception):
+    """Erro ao carregar conversa de arquivo."""
+
+
 class ConversationManager:
     """Gerencia o histórico de mensagens da conversa."""
 
@@ -133,3 +137,82 @@ class ConversationManager:
     def message_count(self) -> int:
         """Retorna o número de mensagens (excluindo system)."""
         return sum(1 for msg in self.messages if msg["role"] != "system")
+
+    def list_history_files(self) -> list[tuple[str, str, str]]:
+        """
+        Lista arquivos de histórico disponíveis.
+
+        Returns:
+            Lista de tuplas (nome_arquivo, timestamp, modelo) ordenada por data.
+        """
+        history_dir = Path(config.HISTORY_DIR)
+
+        if not history_dir.exists():
+            return []
+
+        files = []
+        for filepath in history_dir.glob("*.json"):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                timestamp = data.get("timestamp", "Desconhecido")
+                model = data.get("model", "Desconhecido")
+                files.append((filepath.name, timestamp, model))
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        files.sort(key=lambda x: x[1], reverse=True)
+        return files
+
+    def load_from_file(self, filename: str) -> int:
+        """
+        Carrega histórico de conversa de um arquivo JSON.
+
+        Args:
+            filename: Nome do arquivo ou caminho completo.
+
+        Returns:
+            Número de mensagens carregadas.
+
+        Raises:
+            ConversationLoadError: Se arquivo inválido ou não encontrado.
+        """
+        path = Path(filename)
+        if not path.is_absolute():
+            path = Path(config.HISTORY_DIR) / self._sanitize_filename(filename)
+
+        if not path.exists():
+            raise ConversationLoadError(f"Arquivo não encontrado: {path}")
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ConversationLoadError(f"Arquivo JSON inválido: {e}")
+        except OSError as e:
+            raise ConversationLoadError(f"Erro ao ler arquivo: {e}")
+
+        if not isinstance(data, dict):
+            raise ConversationLoadError("Estrutura de arquivo inválida: esperado objeto JSON")
+
+        if "messages" not in data:
+            raise ConversationLoadError("Arquivo não contém campo 'messages'")
+
+        messages = data["messages"]
+        if not isinstance(messages, list):
+            raise ConversationLoadError("Campo 'messages' deve ser uma lista")
+
+        for i, msg in enumerate(messages):
+            if not isinstance(msg, dict):
+                raise ConversationLoadError(f"Mensagem {i} inválida: esperado objeto")
+            if "role" not in msg or "content" not in msg:
+                raise ConversationLoadError(f"Mensagem {i} sem 'role' ou 'content'")
+            if msg["role"] not in ("user", "assistant"):
+                raise ConversationLoadError(f"Mensagem {i} com role inválido: {msg['role']}")
+
+        self._init_system_message()
+        for msg in messages:
+            self.messages.append({"role": msg["role"], "content": msg["content"]})
+
+        self._enforce_history_limit()
+        return len(messages)

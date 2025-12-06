@@ -8,7 +8,7 @@ manter conversas contextualizadas com o usuário.
 
 import sys
 from utils.api import OpenRouterClient, APIError
-from utils.conversation import ConversationManager
+from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
 
@@ -59,6 +59,24 @@ def handle_command(
                     client.set_model(arg)
                     display.show_model_changed(arg)
                 except ValueError as e:
+                    display.show_error(str(e))
+            return True
+
+    if user_input_lower in config.LIST_COMMANDS:
+        files = conversation.list_history_files()
+        display.show_history_list(files)
+        return True
+
+    for cmd in config.LOAD_COMMANDS:
+        if user_input_lower.startswith(cmd):
+            arg = user_input[len(cmd):].strip()
+            if not arg:
+                display.show_error("Uso: /carregar <nome_arquivo>")
+            else:
+                try:
+                    count = conversation.load_from_file(arg)
+                    display.show_success(f"Histórico carregado: {count} mensagens")
+                except ConversationLoadError as e:
                     display.show_error(str(e))
             return True
 
