@@ -166,10 +166,6 @@ class Display:
         """Exibe uma mensagem de erro."""
         self.console.print(f"\n[bold red]✗[/bold red] {message}\n")
 
-    def show_warning(self, message: str) -> None:
-        """Exibe um aviso."""
-        self.console.print(f"[bold yellow]![/bold yellow] {message}")
-
     def show_success(self, message: str) -> None:
         """Exibe uma mensagem de sucesso."""
         self.console.print(f"[bold green]✓[/bold green] {message}")

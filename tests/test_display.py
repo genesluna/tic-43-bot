@@ -83,14 +83,6 @@ class TestDisplay:
         captured = capsys.readouterr()
         assert "Algo deu errado" in captured.out
 
-    def test_show_warning(self, capsys):
-        """Verifica se mensagem de aviso é exibida."""
-        display = Display()
-        display.show_warning("Atenção")
-
-        captured = capsys.readouterr()
-        assert "Atenção" in captured.out
-
     def test_show_info(self, capsys):
         """Verifica se mensagem de informação é exibida."""
         display = Display()
