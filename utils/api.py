@@ -120,13 +120,13 @@ class OpenRouterClient:
     ) -> tuple[float | None, bool]:
         """Trata rate limiting com retry e backoff."""
         retry_after = self._get_retry_after(response)
-        backoff = self._calculate_backoff(attempt, retry_after)
-        logger.warning(
-            f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-            f"Aguardando {backoff:.1f}s..."
-        )
         should_retry = attempt < DEFAULT_MAX_RETRIES - 1
         if should_retry:
+            backoff = self._calculate_backoff(attempt, retry_after)
+            logger.warning(
+                f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                f"Aguardando {backoff:.1f}s..."
+            )
             time.sleep(backoff)
         return retry_after, should_retry
 
