@@ -2,6 +2,7 @@
 
 import json
 import logging
+import random
 import threading
 import time
 import httpx
@@ -92,11 +93,12 @@ class OpenRouterClient:
         return None
 
     def _calculate_backoff(self, attempt: int, retry_after: float | None = None) -> float:
-        """Calcula tempo de espera com exponential backoff."""
+        """Calcula tempo de espera com exponential backoff e jitter."""
         if retry_after is not None:
             return min(retry_after, DEFAULT_MAX_BACKOFF)
         backoff = DEFAULT_INITIAL_BACKOFF * (DEFAULT_BACKOFF_MULTIPLIER ** attempt)
-        return min(backoff, DEFAULT_MAX_BACKOFF)
+        jitter = 0.5 + random.random()
+        return min(backoff * jitter, DEFAULT_MAX_BACKOFF)
 
     def send_message(self, messages: list[dict]) -> str:
         """

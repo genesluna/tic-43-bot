@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import httpx
-from utils.api import OpenRouterClient, APIError
+from utils.api import OpenRouterClient, APIError, RateLimitError
 
 
 class TestOpenRouterClient:
@@ -135,12 +135,14 @@ class TestOpenRouterClient:
 
         assert "Chave de API inválida" in str(exc_info.value)
 
+    @patch("utils.api.time.sleep")
     @patch("utils.api.httpx.Client")
-    def test_send_message_rate_limit(self, mock_client_class):
-        """Verifica se erro 429 é tratado corretamente."""
+    def test_send_message_rate_limit(self, mock_client_class, mock_sleep):
+        """Verifica se erro 429 é tratado com retry e RateLimitError."""
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_response.text = "Too Many Requests"
+        mock_response.headers = {"Retry-After": "5"}
 
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
@@ -151,10 +153,12 @@ class TestOpenRouterClient:
         client = OpenRouterClient()
         client._api_key = "test_key"
 
-        with pytest.raises(APIError) as exc_info:
+        with pytest.raises(RateLimitError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
 
         assert "Limite de requisições excedido" in str(exc_info.value)
+        assert exc_info.value.retry_after == 5.0
+        assert mock_sleep.call_count == 2
 
     @patch("utils.api.httpx.Client")
     def test_send_message_timeout(self, mock_client_class):
@@ -333,3 +337,124 @@ class TestOpenRouterClient:
             list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
 
         assert "Chave de API inválida" in str(exc_info.value)
+
+    @patch("utils.api.time.sleep")
+    @patch("utils.api.httpx.Client")
+    def test_send_message_stream_rate_limit(self, mock_client_class, mock_sleep):
+        """Verifica se erro 429 é tratado com retry no streaming."""
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 429
+        mock_stream_response.headers = {}
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        with pytest.raises(RateLimitError) as exc_info:
+            list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
+
+        assert "Limite de requisições excedido" in str(exc_info.value)
+        assert mock_sleep.call_count == 2
+
+
+class TestRateLimitError:
+    """Testes para a classe RateLimitError."""
+
+    def test_inherits_from_api_error(self):
+        """RateLimitError deve herdar de APIError."""
+        assert issubclass(RateLimitError, APIError)
+
+    def test_retry_after_attribute(self):
+        """RateLimitError deve armazenar retry_after."""
+        error = RateLimitError("Rate limited", retry_after=30.0)
+        assert error.retry_after == 30.0
+        assert str(error) == "Rate limited"
+
+    def test_retry_after_none(self):
+        """RateLimitError deve aceitar retry_after=None."""
+        error = RateLimitError("Rate limited")
+        assert error.retry_after is None
+
+
+class TestBackoffCalculation:
+    """Testes para cálculo de backoff."""
+
+    def test_calculate_backoff_with_retry_after(self):
+        """Deve usar retry_after quando fornecido."""
+        client = OpenRouterClient()
+        result = client._calculate_backoff(0, retry_after=5.0)
+        assert result == 5.0
+
+    def test_calculate_backoff_retry_after_respects_max(self):
+        """retry_after deve respeitar o máximo."""
+        client = OpenRouterClient()
+        result = client._calculate_backoff(0, retry_after=100.0)
+        assert result == 30.0
+
+    @patch("utils.api.random.random", return_value=0.5)
+    def test_calculate_backoff_exponential(self, mock_random):
+        """Deve calcular backoff exponencial com jitter."""
+        client = OpenRouterClient()
+        result_0 = client._calculate_backoff(0)
+        result_1 = client._calculate_backoff(1)
+        result_2 = client._calculate_backoff(2)
+
+        assert result_0 == 1.0
+        assert result_1 == 2.0
+        assert result_2 == 4.0
+
+    @patch("utils.api.random.random", return_value=0.5)
+    def test_calculate_backoff_respects_max(self, mock_random):
+        """Backoff não deve exceder o máximo."""
+        client = OpenRouterClient()
+        result = client._calculate_backoff(10)
+        assert result == 30.0
+
+    def test_calculate_backoff_has_jitter(self):
+        """Backoff deve incluir jitter (variação aleatória)."""
+        client = OpenRouterClient()
+        results = [client._calculate_backoff(1) for _ in range(10)]
+        assert len(set(results)) > 1
+
+
+class TestRetryAfterHeader:
+    """Testes para parsing do header Retry-After."""
+
+    def test_get_retry_after_valid(self):
+        """Deve parsear header Retry-After válido."""
+        client = OpenRouterClient()
+        response = MagicMock()
+        response.headers = {"Retry-After": "45"}
+        result = client._get_retry_after(response)
+        assert result == 45.0
+
+    def test_get_retry_after_float(self):
+        """Deve parsear header Retry-After com float."""
+        client = OpenRouterClient()
+        response = MagicMock()
+        response.headers = {"Retry-After": "2.5"}
+        result = client._get_retry_after(response)
+        assert result == 2.5
+
+    def test_get_retry_after_invalid(self):
+        """Deve retornar None para Retry-After inválido."""
+        client = OpenRouterClient()
+        response = MagicMock()
+        response.headers = {"Retry-After": "invalid"}
+        result = client._get_retry_after(response)
+        assert result is None
+
+    def test_get_retry_after_missing(self):
+        """Deve retornar None quando header não existe."""
+        client = OpenRouterClient()
+        response = MagicMock()
+        response.headers = {}
+        result = client._get_retry_after(response)
+        assert result is None
