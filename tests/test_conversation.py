@@ -221,3 +221,26 @@ class TestConversationManager:
 
         manager.clear()
         assert manager.message_count() == 0
+
+    def test_save_to_file_custom_history_dir(self, tmp_path):
+        """Verifica se HISTORY_DIR customizado é respeitado."""
+        custom_dir = tmp_path / "custom_history"
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(custom_dir)
+            mock_config.OPENROUTER_MODEL = "test-model"
+            mock_config.SYSTEM_PROMPT = "Test prompt"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+            manager.add_user_message("Teste")
+
+            saved_path = manager.save_to_file("test.json")
+
+            assert str(custom_dir) in saved_path
+            assert custom_dir.exists()
+            assert (custom_dir / "test.json").exists()

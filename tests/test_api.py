@@ -458,3 +458,92 @@ class TestRetryAfterHeader:
         response.headers = {}
         result = client._get_retry_after(response)
         assert result is None
+
+
+class TestRetrySuccess:
+    """Testes para retry bem-sucedido após falha inicial."""
+
+    @patch("utils.api.time.sleep")
+    @patch("utils.api.httpx.Client")
+    def test_send_message_retry_success_after_rate_limit(self, mock_client_class, mock_sleep):
+        """Deve retornar resposta após retry bem-sucedido de rate limit."""
+        mock_rate_limit_response = MagicMock()
+        mock_rate_limit_response.status_code = 429
+        mock_rate_limit_response.headers = {}
+
+        mock_success_response = MagicMock()
+        mock_success_response.status_code = 200
+        mock_success_response.json.return_value = {
+            "choices": [{"message": {"content": "Resposta de sucesso"}}]
+        }
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.post.side_effect = [mock_rate_limit_response, mock_success_response]
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        result = client.send_message([{"role": "user", "content": "Olá"}])
+
+        assert result == "Resposta de sucesso"
+        assert mock_sleep.call_count == 1
+        assert mock_client.post.call_count == 2
+
+    @patch("utils.api.time.sleep")
+    @patch("utils.api.httpx.Client")
+    def test_send_message_retry_success_after_timeout(self, mock_client_class, mock_sleep):
+        """Deve retornar resposta após retry bem-sucedido de timeout."""
+        mock_success_response = MagicMock()
+        mock_success_response.status_code = 200
+        mock_success_response.json.return_value = {
+            "choices": [{"message": {"content": "Resposta após timeout"}}]
+        }
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.post.side_effect = [
+            httpx.TimeoutException("Timeout"),
+            mock_success_response
+        ]
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        result = client.send_message([{"role": "user", "content": "Olá"}])
+
+        assert result == "Resposta após timeout"
+        assert mock_sleep.call_count == 1
+        assert mock_client.post.call_count == 2
+
+    @patch("utils.api.time.sleep")
+    @patch("utils.api.httpx.Client")
+    def test_send_message_retry_success_after_connection_error(self, mock_client_class, mock_sleep):
+        """Deve retornar resposta após retry bem-sucedido de erro de conexão."""
+        mock_success_response = MagicMock()
+        mock_success_response.status_code = 200
+        mock_success_response.json.return_value = {
+            "choices": [{"message": {"content": "Resposta após erro de conexão"}}]
+        }
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.post.side_effect = [
+            httpx.ConnectError("Connection failed"),
+            mock_success_response
+        ]
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        result = client.send_message([{"role": "user", "content": "Olá"}])
+
+        assert result == "Resposta após erro de conexão"
+        assert mock_sleep.call_count == 1
+        assert mock_client.post.call_count == 2

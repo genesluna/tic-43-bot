@@ -12,6 +12,8 @@ from utils.conversation import ConversationManager
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
 
+CHARS_PER_TOKEN = 4
+
 
 def handle_command(
     user_input: str,
@@ -101,8 +103,7 @@ def main():
                     for chunk in client.send_message_stream(conversation.get_messages()):
                         response_chunks.append(chunk)
                         char_count += len(chunk)
-                        # Approximate token count: ~4 chars per token for English/Portuguese
-                        display.update_spinner_tokens(char_count // 4)
+                        display.update_spinner_tokens(char_count // CHARS_PER_TOKEN)
 
                     display.stop_spinner()
 

@@ -100,6 +100,36 @@ class OpenRouterClient:
         jitter = 0.5 + random.random()
         return min(backoff * jitter, DEFAULT_MAX_BACKOFF)
 
+    def _handle_transient_error(
+        self, error_type: str, message: str, attempt: int
+    ) -> tuple[APIError, bool]:
+        """Trata erros transientes com retry e backoff."""
+        error = APIError(message)
+        should_retry = attempt < DEFAULT_MAX_RETRIES - 1
+        if should_retry:
+            backoff = self._calculate_backoff(attempt)
+            logger.warning(
+                f"{error_type}. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+                f"Aguardando {backoff:.1f}s..."
+            )
+            time.sleep(backoff)
+        return error, should_retry
+
+    def _handle_rate_limit(
+        self, response: httpx.Response, attempt: int
+    ) -> tuple[float | None, bool]:
+        """Trata rate limiting com retry e backoff."""
+        retry_after = self._get_retry_after(response)
+        backoff = self._calculate_backoff(attempt, retry_after)
+        logger.warning(
+            f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
+            f"Aguardando {backoff:.1f}s..."
+        )
+        should_retry = attempt < DEFAULT_MAX_RETRIES - 1
+        if should_retry:
+            time.sleep(backoff)
+        return retry_after, should_retry
+
     def send_message(self, messages: list[dict]) -> str:
         """
         Envia mensagens para a API e retorna a resposta.
@@ -142,14 +172,8 @@ class OpenRouterClient:
                     raise APIError("Chave de API inválida. Verifique sua configuração.")
 
                 if response.status_code == 429:
-                    retry_after = self._get_retry_after(response)
-                    backoff = self._calculate_backoff(attempt, retry_after)
-                    logger.warning(
-                        f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                        f"Aguardando {backoff:.1f}s..."
-                    )
-                    if attempt < DEFAULT_MAX_RETRIES - 1:
-                        time.sleep(backoff)
+                    retry_after, should_retry = self._handle_rate_limit(response, attempt)
+                    if should_retry:
                         continue
                     raise RateLimitError(
                         "Limite de requisições excedido após várias tentativas.",
@@ -172,24 +196,16 @@ class OpenRouterClient:
                 return content
 
             except httpx.TimeoutException:
-                last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
-                if attempt < DEFAULT_MAX_RETRIES - 1:
-                    backoff = self._calculate_backoff(attempt)
-                    logger.warning(
-                        f"Timeout. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                        f"Aguardando {backoff:.1f}s..."
-                    )
-                    time.sleep(backoff)
+                last_error, should_retry = self._handle_transient_error(
+                    "Timeout", "Tempo limite excedido. Verifique sua conexão.", attempt
+                )
+                if should_retry:
                     continue
             except httpx.ConnectError:
-                last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
-                if attempt < DEFAULT_MAX_RETRIES - 1:
-                    backoff = self._calculate_backoff(attempt)
-                    logger.warning(
-                        f"Erro de conexão. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                        f"Aguardando {backoff:.1f}s..."
-                    )
-                    time.sleep(backoff)
+                last_error, should_retry = self._handle_transient_error(
+                    "Erro de conexão", "Não foi possível conectar à API. Verifique sua conexão.", attempt
+                )
+                if should_retry:
                     continue
 
         if last_error:
@@ -239,14 +255,8 @@ class OpenRouterClient:
                         raise APIError("Chave de API inválida. Verifique sua configuração.")
 
                     if response.status_code == 429:
-                        retry_after = self._get_retry_after(response)
-                        backoff = self._calculate_backoff(attempt, retry_after)
-                        logger.warning(
-                            f"Rate limit atingido. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                            f"Aguardando {backoff:.1f}s..."
-                        )
-                        if attempt < DEFAULT_MAX_RETRIES - 1:
-                            time.sleep(backoff)
+                        retry_after, should_retry = self._handle_rate_limit(response, attempt)
+                        if should_retry:
                             continue
                         raise RateLimitError(
                             "Limite de requisições excedido após várias tentativas.",
@@ -281,24 +291,16 @@ class OpenRouterClient:
                     return
 
             except httpx.TimeoutException:
-                last_error = APIError("Tempo limite excedido. Verifique sua conexão.")
-                if attempt < DEFAULT_MAX_RETRIES - 1:
-                    backoff = self._calculate_backoff(attempt)
-                    logger.warning(
-                        f"Timeout. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                        f"Aguardando {backoff:.1f}s..."
-                    )
-                    time.sleep(backoff)
+                last_error, should_retry = self._handle_transient_error(
+                    "Timeout", "Tempo limite excedido. Verifique sua conexão.", attempt
+                )
+                if should_retry:
                     continue
             except httpx.ConnectError:
-                last_error = APIError("Não foi possível conectar à API. Verifique sua conexão.")
-                if attempt < DEFAULT_MAX_RETRIES - 1:
-                    backoff = self._calculate_backoff(attempt)
-                    logger.warning(
-                        f"Erro de conexão. Tentativa {attempt + 1}/{DEFAULT_MAX_RETRIES}. "
-                        f"Aguardando {backoff:.1f}s..."
-                    )
-                    time.sleep(backoff)
+                last_error, should_retry = self._handle_transient_error(
+                    "Erro de conexão", "Não foi possível conectar à API. Verifique sua conexão.", attempt
+                )
+                if should_retry:
                     continue
 
         if last_error:
