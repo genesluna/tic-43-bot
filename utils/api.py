@@ -6,11 +6,24 @@ import random
 import re
 import threading
 import time
+from dataclasses import dataclass
 import httpx
-from typing import Any, Generator, Iterator, Self
+from typing import Any, Generator, Self
 from .config import config, MAX_MESSAGE_CONTENT_SIZE
 
-__all__ = ["OpenRouterClient", "APIError", "RateLimitError", "StreamingResponse"]
+__all__ = ["OpenRouterClient", "APIError", "RateLimitError", "StreamingResponse", "APIResponse"]
+
+
+@dataclass
+class APIResponse:
+    """Resposta da API com conteúdo e metadados."""
+
+    content: str
+    total_tokens: int = 0
+
+    def __repr__(self) -> str:
+        preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
+        return f"APIResponse(content={preview!r}, tokens={self.total_tokens})"
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +341,7 @@ class OpenRouterClient:
 
         return False, APIError(f"Erro de rede: {error}")
 
-    def send_message(self, messages: list[dict[str, str]]) -> str:
+    def send_message(self, messages: list[dict[str, str]]) -> APIResponse:
         """
         Envia mensagens para a API e retorna a resposta.
 
@@ -336,7 +349,7 @@ class OpenRouterClient:
             messages: Lista de mensagens no formato OpenAI.
 
         Returns:
-            Texto da resposta do modelo.
+            APIResponse com o texto e contagem de tokens.
 
         Raises:
             APIError: Em caso de erro na comunicação.
@@ -371,8 +384,10 @@ class OpenRouterClient:
                     if content is None:
                         raise APIError("Resposta da API não contém conteúdo.")
 
-                    logger.debug("Resposta recebida (%d chars)", len(content))
-                    return content
+                    total_tokens = data.get("usage", {}).get("total_tokens", 0)
+
+                    logger.debug("Resposta recebida (%d chars, %d tokens)", len(content), total_tokens)
+                    return APIResponse(content=content, total_tokens=total_tokens)
 
                 except (httpx.TimeoutException, httpx.ConnectError) as e:
                     should_retry, last_error = self._handle_network_error(e, attempt)
@@ -419,6 +434,9 @@ class OpenRouterClient:
                         json=payload,
                     ) as response:
                         if response.status_code >= 400:
+                            # Em streaming, o corpo não é lido automaticamente.
+                            # Lê o corpo para obter mensagem de erro (exceto 401,
+                            # onde já sabemos que é erro de autenticação).
                             if response.status_code != 401:
                                 response.read()
                             should_proceed, error = self._handle_response_error(

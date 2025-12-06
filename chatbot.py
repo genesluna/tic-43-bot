@@ -19,6 +19,9 @@ from utils.display import Display
 from utils.config import config, ConfigurationError
 from utils.logging_config import setup_logging
 
+# Aproximação: ~4 caracteres por token (varia por modelo e idioma)
+CHARS_PER_TOKEN = 4
+
 __version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,7 @@ class CommandResult(Enum):
     CONTINUE = auto()  # Continua o loop principal
     EXIT = auto()      # Encerra o chatbot
     NOT_COMMAND = auto()  # Não é um comando, processar como mensagem
+    TOGGLE_STREAM = auto()  # Alterna modo streaming
 
 
 def _extract_command_arg(user_input: str, commands: tuple[str, ...]) -> str | None:
@@ -67,6 +71,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--log-file",
         metavar="FILE",
         help="arquivo para salvar logs",
+    )
+    parser.add_argument(
+        "--no-stream",
+        action="store_true",
+        help="desativa streaming (mostra spinner com tokens)",
     )
     return parser.parse_args(argv)
 
@@ -127,6 +136,9 @@ def handle_command(
         display.show_history_list(files)
         return CommandResult.CONTINUE
 
+    if user_input_lower in config.STREAM_COMMANDS:
+        return CommandResult.TOGGLE_STREAM
+
     load_arg = _extract_command_arg(user_input, config.LOAD_COMMANDS)
     if load_arg is not None:
         if not load_arg:
@@ -173,6 +185,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 sys.exit(1)
         conversation = ConversationManager()
 
+        # Determina modo de streaming (CLI sobrescreve config)
+        use_streaming = config.STREAM_RESPONSE and not args.no_stream
+
         display.show_banner()
         display.show_info("Digite /ajuda para ver os comandos disponíveis.")
         display.console.print()
@@ -196,24 +211,45 @@ def main(argv: Sequence[str] | None = None) -> None:
                     break
                 elif command_result == CommandResult.CONTINUE:
                     continue
+                elif command_result == CommandResult.TOGGLE_STREAM:
+                    use_streaming = not use_streaming
+                    mode = "ativado" if use_streaming else "desativado"
+                    display.show_success(f"Streaming {mode}")
+                    continue
 
                 conversation.add_user_message(user_input)
+                messages = conversation.get_messages()
 
                 try:
                     display.start_spinner()
-                    first_chunk = True
 
-                    for chunk in client.send_message_stream(conversation.get_messages()):
+                    first_chunk = True
+                    char_count = 0
+                    response_buffer: list[str] = []
+
+                    for chunk in client.send_message_stream(messages):
                         if first_chunk:
-                            display.transition_spinner_to_streaming()
+                            if use_streaming:
+                                display.transition_spinner_to_streaming()
                             first_chunk = False
-                        display.add_streaming_chunk(chunk)
+
+                        response_buffer.append(chunk)
+                        char_count += len(chunk)
+                        display.update_spinner_tokens(char_count // CHARS_PER_TOKEN)
+
+                        if use_streaming:
+                            display.add_streaming_chunk(chunk)
 
                     if first_chunk:
                         display.stop_spinner()
                         response = ""
-                    else:
+                    elif use_streaming:
                         response = display.stop_streaming()
+                    else:
+                        display.stop_spinner()
+                        response = "".join(response_buffer)
+                        if response:
+                            display.show_bot_message(response)
 
                     if response:
                         conversation.add_assistant_message(response)

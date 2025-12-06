@@ -99,7 +99,8 @@ class RotatingSpinner:
         if tokens > 0:
             parts.extend([
                 (" · ", "dim"),
-                (self._format_tokens(tokens), "dim"),
+                ("↓ ", "cyan"),
+                (self._format_tokens(tokens), "cyan"),
                 (" tokens", "dim"),
             ])
         parts.append((")", "dim"))
@@ -119,10 +120,10 @@ class RotatingSpinner:
     def _format_tokens(self, count: int) -> str:
         """Formata contagem de tokens para exibição legível."""
         if count >= 1_000_000:
-            return f"~{count / 1_000_000:.1f}M"
+            return f"{count / 1_000_000:.1f}m"
         if count >= 1_000:
-            return f"~{count / 1_000:.1f}K"
-        return f"~{count}"
+            return f"{count / 1_000:.1f}k"
+        return str(count)
 
     def _animate(self) -> None:
         last_word_change = time.time()
@@ -366,10 +367,11 @@ class Display:
             ("/listar, /list", "Lista históricos salvos"),
             ("/carregar, /load", "Carrega histórico de arquivo"),
             ("/ajuda, /help", "Mostra esta mensagem"),
-            ("/modelo [nome]", "Mostra ou altera o modelo atual"),
+            ("/modelo, /model [nome]", "Mostra ou altera o modelo atual"),
+            ("/streaming, /stream", "Alterna modo streaming on/off"),
         ]
         for cmd, desc in commands:
-            self.console.print(f"  [bold cyan]{cmd:<20}[/bold cyan] [dim]{desc}[/dim]")
+            self.console.print(f"  [bold cyan]{cmd:<28}[/bold cyan] [dim]{desc}[/dim]")
         self.console.print()
 
     def show_bot_message(self, message: str) -> None:
@@ -463,7 +465,9 @@ class Display:
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""
         try:
-            self.console.print("[bold cyan]>[/bold cyan] ", end="")
-            return input()
+            # Usa marcadores readline (\001 e \002) para indicar caracteres não-imprimíveis
+            # Isso evita que o readline conte os códigos ANSI como caracteres visíveis
+            prompt = "\001\033[1;36m\002>\001\033[0m\002 "
+            return input(prompt)
         except EOFError:
             return "sair"

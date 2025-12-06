@@ -2,6 +2,7 @@
 
 import os
 import threading
+from typing import Any, Callable, TypeVar
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +18,9 @@ class ConfigurationError(Exception):
     """Erro de configuração do chatbot."""
 
 
+_T = TypeVar("_T")
+
+
 class _ThreadSafeCachedProperty:
     """Descriptor que implementa cached_property com thread-safety.
 
@@ -25,17 +29,17 @@ class _ThreadSafeCachedProperty:
     propriedade pela primeira vez simultaneamente.
     """
 
-    def __init__(self, func):
-        self.func = func
-        self.attr_name = None
-        self.lock = threading.Lock()
+    def __init__(self, func: Callable[[Any], _T]) -> None:
+        self.func: Callable[[Any], _T] = func
+        self.attr_name: str | None = None
+        self.lock: threading.Lock = threading.Lock()
 
-    def __set_name__(self, owner, name):
+    def __set_name__(self, owner: type, name: str) -> None:
         self.attr_name = name
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance: Any, owner: type | None = None) -> _T:
         if instance is None:
-            return self
+            return self  # type: ignore[return-value]
 
         try:
             return instance.__dict__[self.attr_name]
@@ -65,9 +69,10 @@ class Config:
     CLEAR_COMMANDS: tuple[str, ...] = ("/limpar", "/clear")
     SAVE_COMMANDS: tuple[str, ...] = ("/salvar", "/save")
     HELP_COMMANDS: tuple[str, ...] = ("/ajuda", "/help")
-    MODEL_COMMANDS: tuple[str, ...] = ("/modelo",)
+    MODEL_COMMANDS: tuple[str, ...] = ("/modelo", "/model")
     LOAD_COMMANDS: tuple[str, ...] = ("/carregar", "/load")
     LIST_COMMANDS: tuple[str, ...] = ("/listar", "/list")
+    STREAM_COMMANDS: tuple[str, ...] = ("/streaming", "/stream")
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1/chat/completions"
 
     @_ThreadSafeCachedProperty
@@ -122,6 +127,11 @@ class Config:
     @_ThreadSafeCachedProperty
     def HISTORY_DIR(self) -> str:
         return os.getenv("HISTORY_DIR", "./history")
+
+    @_ThreadSafeCachedProperty
+    def STREAM_RESPONSE(self) -> bool:
+        """Se True, mostra resposta em streaming. Se False, mostra spinner com tokens."""
+        return os.getenv("STREAM_RESPONSE", "true").lower() in ("true", "1", "yes")
 
     @_ThreadSafeCachedProperty
     def LOG_LEVEL(self) -> str:

@@ -79,10 +79,10 @@ class TestRotatingSpinner:
         console = Console()
         spinner = RotatingSpinner(console)
 
-        assert spinner._format_tokens(1000) == "~1.0K"
-        assert spinner._format_tokens(1500) == "~1.5K"
-        assert spinner._format_tokens(10000) == "~10.0K"
-        assert spinner._format_tokens(999999) == "~1000.0K"
+        assert spinner._format_tokens(1000) == "1.0k"
+        assert spinner._format_tokens(1500) == "1.5k"
+        assert spinner._format_tokens(10000) == "10.0k"
+        assert spinner._format_tokens(999999) == "1000.0k"
 
     def test_format_tokens_millions(self):
         """Verifica formatação de tokens em milhões (M)."""
@@ -91,9 +91,9 @@ class TestRotatingSpinner:
         console = Console()
         spinner = RotatingSpinner(console)
 
-        assert spinner._format_tokens(1000000) == "~1.0M"
-        assert spinner._format_tokens(1500000) == "~1.5M"
-        assert spinner._format_tokens(10000000) == "~10.0M"
+        assert spinner._format_tokens(1000000) == "1.0m"
+        assert spinner._format_tokens(1500000) == "1.5m"
+        assert spinner._format_tokens(10000000) == "10.0m"
 
 
 class TestDisplay:
@@ -301,8 +301,7 @@ class TestDisplay:
 
         renderable = spinner._get_renderable()
         text_str = str(renderable)
-        assert "~42" in text_str
-        assert "tokens" in text_str
+        assert "↓ 42 tokens" in text_str
 
     def test_spinner_double_stop_is_safe(self):
         """Parar spinner duas vezes não deve causar erro."""
@@ -407,8 +406,7 @@ class TestDisplay:
         renderable = spinner._get_renderable()
         text_str = str(renderable)
 
-        assert "~100" in text_str
-        assert "tokens" in text_str
+        assert "↓ 100 tokens" in text_str
 
 
 class TestStreamingTextDisplay:

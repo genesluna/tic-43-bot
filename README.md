@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-290%20passed-brightgreen.svg)](#testes)
-[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testes)
+[![Coverage](https://img.shields.io/badge/coverage->80%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -20,7 +20,7 @@ Um chatbot interativo via terminal que utiliza modelos de IA generativa através
 | **Interface Rica**       | Terminal com formatação colorida e suporte a Markdown           |
 | **Multi-modelo**         | Compatível com GPT-4, Claude, Llama e outros via OpenRouter     |
 | **Contexto Persistente** | Mantém histórico da conversa para respostas contextualizadas    |
-| **Streaming**            | Respostas em tempo real com indicador de progresso              |
+| **Streaming**            | Modo streaming ou contagem de tokens animada (configurável)     |
 | **Retry Inteligente**    | Recuperação automática de erros de rede com backoff exponencial |
 | **Personalizável**       | System prompt, idioma, tom e formato configuráveis              |
 | **Salvamento**           | Exporta conversas para JSON                                     |
@@ -68,6 +68,7 @@ python chatbot.py
 python chatbot.py --help              # Exibe ajuda
 python chatbot.py --version           # Exibe versão
 python chatbot.py -m anthropic/claude-3.5-sonnet  # Define modelo
+python chatbot.py --no-stream         # Mostra tokens animados enquanto aguarda
 python chatbot.py --log-level DEBUG   # Ativa logging detalhado
 python chatbot.py --log-file app.log  # Salva logs em arquivo
 ```
@@ -82,7 +83,8 @@ python chatbot.py --log-file app.log  # Salva logs em arquivo
 | `/listar`, `/list`                       | Lista históricos salvos           |
 | `/carregar <arquivo>`, `/load <arquivo>` | Carrega histórico de arquivo      |
 | `/ajuda`, `/help`                        | Mostra comandos disponíveis       |
-| `/modelo [nome]`                         | Mostra ou altera o modelo atual   |
+| `/modelo [nome]`, `/model [nome]`        | Mostra ou altera o modelo atual   |
+| `/streaming`, `/stream`                  | Alterna modo streaming on/off     |
 
 ### Exemplo de Conversa
 
@@ -125,6 +127,7 @@ Todas as configurações são feitas via variáveis de ambiente no arquivo `.env
 | `MAX_MESSAGE_LENGTH`   | Limite de caracteres/mensagem    | `10000`                                |
 | `MAX_HISTORY_SIZE`     | Máximo de pares de conversa      | `25`                                   |
 | `HISTORY_DIR`          | Diretório para salvar histórico  | `./history`                            |
+| `STREAM_RESPONSE`      | Modo streaming (true/false)      | `true`                                 |
 | `LOG_LEVEL`            | Nível de logging                 | `WARNING`                              |
 | `LOG_FORMAT`           | Formato do log (console/json)    | `console`                              |
 | `LOG_FILE`             | Arquivo de log (opcional)        | -                                      |
@@ -179,7 +182,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 290 testes com 94% de cobertura.
+O projeto possui uma suíte de testes abrangente com mais de 80% de cobertura.
 
 ```bash
 # Executar testes
@@ -197,7 +200,7 @@ pytest tests/ -v --cov=utils --cov=chatbot --cov-report=term-missing
 chatbot-tic43/
 ├── chatbot.py             # Ponto de entrada e loop principal
 ├── utils/
-│   ├── api.py             # Cliente OpenRouter (retry, streaming)
+│   ├── api.py             # Cliente OpenRouter (retry, streaming, tokens)
 │   ├── config.py          # Configurações via ambiente
 │   ├── conversation.py    # Gerenciamento de histórico
 │   ├── display.py         # Interface rica do terminal

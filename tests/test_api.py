@@ -6,7 +6,7 @@ import threading
 import time
 from unittest.mock import patch, MagicMock
 import httpx
-from utils.api import OpenRouterClient, APIError, RateLimitError, StreamingResponse
+from utils.api import OpenRouterClient, APIError, RateLimitError, StreamingResponse, APIResponse
 from utils.config import MAX_MESSAGE_CONTENT_SIZE
 
 
@@ -112,7 +112,8 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Olá! Como posso ajudar?"}}]
+            "choices": [{"message": {"content": "Olá! Como posso ajudar?"}}],
+            "usage": {"total_tokens": 150}
         }
 
         mock_client = MagicMock()
@@ -126,7 +127,9 @@ class TestOpenRouterClient:
 
         response = client.send_message([{"role": "user", "content": "Olá"}])
 
-        assert response == "Olá! Como posso ajudar?"
+        assert isinstance(response, APIResponse)
+        assert response.content == "Olá! Como posso ajudar?"
+        assert response.total_tokens == 150
 
     @patch("utils.api.httpx.Client")
     def test_send_message_unauthorized(self, mock_client_class):
@@ -488,7 +491,8 @@ class TestRetrySuccess:
         mock_success_response = MagicMock()
         mock_success_response.status_code = 200
         mock_success_response.json.return_value = {
-            "choices": [{"message": {"content": "Resposta de sucesso"}}]
+            "choices": [{"message": {"content": "Resposta de sucesso"}}],
+            "usage": {"total_tokens": 100}
         }
 
         mock_client = MagicMock()
@@ -502,7 +506,7 @@ class TestRetrySuccess:
 
         result = client.send_message([{"role": "user", "content": "Olá"}])
 
-        assert result == "Resposta de sucesso"
+        assert result.content == "Resposta de sucesso"
         assert mock_sleep.call_count == 1
         assert mock_client.post.call_count == 2
 
@@ -513,7 +517,8 @@ class TestRetrySuccess:
         mock_success_response = MagicMock()
         mock_success_response.status_code = 200
         mock_success_response.json.return_value = {
-            "choices": [{"message": {"content": "Resposta após timeout"}}]
+            "choices": [{"message": {"content": "Resposta após timeout"}}],
+            "usage": {"total_tokens": 100}
         }
 
         mock_client = MagicMock()
@@ -530,7 +535,7 @@ class TestRetrySuccess:
 
         result = client.send_message([{"role": "user", "content": "Olá"}])
 
-        assert result == "Resposta após timeout"
+        assert result.content == "Resposta após timeout"
         assert mock_sleep.call_count == 1
         assert mock_client.post.call_count == 2
 
@@ -541,7 +546,8 @@ class TestRetrySuccess:
         mock_success_response = MagicMock()
         mock_success_response.status_code = 200
         mock_success_response.json.return_value = {
-            "choices": [{"message": {"content": "Resposta após erro de conexão"}}]
+            "choices": [{"message": {"content": "Resposta após erro de conexão"}}],
+            "usage": {"total_tokens": 100}
         }
 
         mock_client = MagicMock()
@@ -558,7 +564,7 @@ class TestRetrySuccess:
 
         result = client.send_message([{"role": "user", "content": "Olá"}])
 
-        assert result == "Resposta após erro de conexão"
+        assert result.content == "Resposta após erro de conexão"
         assert mock_sleep.call_count == 1
         assert mock_client.post.call_count == 2
 
@@ -701,6 +707,47 @@ class TestMessageValidation:
 
         # Should not raise
         client._validate_messages([{"role": "user", "content": content_at_limit}])
+
+
+class TestAPIResponse:
+    """Testes para a classe APIResponse."""
+
+    def test_repr_short_content(self):
+        """Verifica __repr__ com conteúdo curto (sem truncation)."""
+        response = APIResponse(content="Hello world", total_tokens=10)
+        repr_str = repr(response)
+
+        assert "Hello world" in repr_str
+        assert "..." not in repr_str
+        assert "tokens=10" in repr_str
+
+    def test_repr_long_content_truncated(self):
+        """Verifica __repr__ com conteúdo longo (com truncation)."""
+        long_content = "x" * 100
+        response = APIResponse(content=long_content, total_tokens=50)
+        repr_str = repr(response)
+
+        assert "..." in repr_str
+        assert "tokens=50" in repr_str
+        assert "x" * 51 not in repr_str
+
+    def test_repr_exactly_50_chars(self):
+        """Verifica __repr__ com exatamente 50 caracteres (sem truncation)."""
+        content_50 = "a" * 50
+        response = APIResponse(content=content_50, total_tokens=25)
+        repr_str = repr(response)
+
+        assert content_50 in repr_str
+        assert "..." not in repr_str
+
+    def test_repr_51_chars(self):
+        """Verifica __repr__ com 51 caracteres (com truncation)."""
+        content_51 = "b" * 51
+        response = APIResponse(content=content_51, total_tokens=30)
+        repr_str = repr(response)
+
+        assert "..." in repr_str
+        assert content_51 not in repr_str
 
 
 class TestStreamingResponse:

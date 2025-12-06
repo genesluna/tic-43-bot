@@ -224,6 +224,26 @@ class TestHandleCommand:
         assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
+    def test_stream_command_toggle(self):
+        """Verifica se '/streaming' retorna TOGGLE_STREAM."""
+        result = handle_command(
+            "/streaming",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result == CommandResult.TOGGLE_STREAM
+
+    def test_stream_command_short(self):
+        """Verifica se '/stream' retorna TOGGLE_STREAM."""
+        result = handle_command(
+            "/stream",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result == CommandResult.TOGGLE_STREAM
+
     def test_regular_message_returns_not_command(self):
         """Verifica se mensagem normal retorna NOT_COMMAND."""
         result = handle_command(
@@ -339,6 +359,7 @@ class TestMain:
         mock_config.MODEL_COMMANDS = ()
         mock_config.LIST_COMMANDS = ()
         mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["Esta mensagem é muito longa", "sair"]
@@ -375,6 +396,7 @@ class TestMain:
         mock_config.MODEL_COMMANDS = ()
         mock_config.LIST_COMMANDS = ()
         mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["Olá", "sair"]
@@ -411,6 +433,7 @@ class TestMain:
         mock_config.MODEL_COMMANDS = ()
         mock_config.LIST_COMMANDS = ()
         mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["Olá", "sair"]
@@ -432,6 +455,163 @@ class TestMain:
         mock_conv.remove_last_user_message.assert_called_once()
         mock_display.show_info.assert_called()
 
+    @patch("chatbot.Display")
+    @patch("chatbot.config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_empty_streaming_iterator(
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
+    ):
+        """Verifica comportamento quando API retorna iterador vazio (sem chunks)."""
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+        mock_config.LIST_COMMANDS = ()
+        mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
+        mock_config.STREAM_RESPONSE = True
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.return_value = iter([])
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main([])
+
+        mock_display.stop_spinner.assert_called()
+        mock_display.transition_spinner_to_streaming.assert_not_called()
+        mock_conv.remove_last_user_message.assert_called_once()
+        mock_display.show_info.assert_called()
+
+    @patch("chatbot.Display")
+    @patch("chatbot.config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_non_streaming_mode(
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
+    ):
+        """Verifica modo não-streaming com --no-stream (usa streaming internamente)."""
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+        mock_config.LIST_COMMANDS = ()
+        mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
+        mock_config.STREAM_RESPONSE = True
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.return_value = iter(["Resposta ", "completa"])
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main(["--no-stream"])
+
+        mock_client.send_message_stream.assert_called_once()
+        mock_display.update_spinner_tokens.assert_called()
+        mock_display.show_bot_message.assert_called_with("Resposta completa")
+        mock_conv.add_assistant_message.assert_called_with("Resposta completa")
+
+    @patch("chatbot.Display")
+    @patch("chatbot.config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_non_streaming_via_config(
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
+    ):
+        """Verifica modo não-streaming via STREAM_RESPONSE=false (usa streaming internamente)."""
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+        mock_config.LIST_COMMANDS = ()
+        mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ()
+        mock_config.STREAM_RESPONSE = False
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.return_value = iter(["Resposta ", "da API"])
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main([])
+
+        mock_client.send_message_stream.assert_called_once()
+        mock_display.show_bot_message.assert_called_with("Resposta da API")
+
+    @patch("chatbot.Display")
+    @patch("chatbot.config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_streaming_toggle_command(
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
+    ):
+        """Verifica que /streaming alterna o modo."""
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+        mock_config.LIST_COMMANDS = ()
+        mock_config.LOAD_COMMANDS = ()
+        mock_config.STREAM_COMMANDS = ("/streaming",)
+        mock_config.STREAM_RESPONSE = True
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["/streaming", "Olá", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.return_value = iter(["Resposta"])
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main([])
+
+        mock_display.show_success.assert_any_call("Streaming desativado")
+        mock_client.send_message_stream.assert_called_once()
+        mock_display.show_bot_message.assert_called_with("Resposta")
+
 
 class TestParseArgs:
     """Testes para a função parse_args."""
@@ -445,6 +625,7 @@ class TestParseArgs:
         assert args.model is None
         assert args.log_level is None
         assert args.log_file is None
+        assert args.no_stream is False
 
     def test_parse_args_model_short(self):
         """Verifica parsing do argumento -m."""
@@ -509,6 +690,28 @@ class TestParseArgs:
             parse_args(["--log-level", "INVALID"])
 
         assert exc_info.value.code != 0
+
+    def test_parse_args_no_stream(self):
+        """Verifica parsing do argumento --no-stream."""
+        from chatbot import parse_args
+
+        args = parse_args(["--no-stream"])
+
+        assert args.no_stream is True
+
+    def test_parse_args_all_options_with_no_stream(self):
+        """Verifica parsing de todos os argumentos incluindo --no-stream."""
+        from chatbot import parse_args
+
+        args = parse_args([
+            "-m", "openai/gpt-4o",
+            "--log-level", "INFO",
+            "--no-stream"
+        ])
+
+        assert args.model == "openai/gpt-4o"
+        assert args.log_level == "INFO"
+        assert args.no_stream is True
 
 
 class TestMainWithArgs:
