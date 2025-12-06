@@ -1,5 +1,6 @@
 """Formatação e exibição no terminal."""
 
+import readline  # Habilita navegação com setas e histórico
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -17,17 +18,18 @@ class Display:
 
     def show_banner(self) -> None:
         """Exibe o banner de boas-vindas."""
-        banner = Text()
-        banner.append("CHATBOT IA", style="bold cyan")
-        banner.append(" - Projeto TIC43", style="dim")
+        logo = """[bold cyan]
+    ████████╗██╗ ██████╗    ██████╗  ██████╗ ████████╗    ██╗  ██╗██████╗
+    ╚══██╔══╝██║██╔════╝    ██╔══██╗██╔═══██╗╚══██╔══╝    ██║  ██║╚════██╗
+       ██║   ██║██║         ██████╔╝██║   ██║   ██║       ███████║ █████╔╝
+       ██║   ██║██║         ██╔══██╗██║   ██║   ██║       ╚════██║ ╚═══██╗
+       ██║   ██║╚██████╗    ██████╔╝╚██████╔╝   ██║            ██║██████╔╝
+       ╚═╝   ╚═╝ ╚═════╝    ╚═════╝  ╚═════╝    ╚═╝            ╚═╝╚═════╝[/bold cyan]
 
-        self.console.print(
-            Panel(
-                banner,
-                border_style="cyan",
-                padding=(1, 2),
-            )
-        )
+    [bold magenta]>[/bold magenta] [bold white]Chatbot Conversacional com IA Generativa[/bold white]
+    [bold yellow]>[/bold yellow] [italic]Powered by OpenRouter[/italic]
+"""
+        self.console.print(logo)
         self.console.print()
 
     def show_help(self) -> None:
@@ -92,6 +94,6 @@ class Display:
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""
         try:
-            return self.console.input("[bold green]Você:[/bold green] ")
+            return input("\033[1;32mVocê:\033[0m ")
         except EOFError:
             return "sair"
