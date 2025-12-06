@@ -137,7 +137,11 @@ class TestConversationManager:
         assert removed is None
 
     def test_history_limit(self):
-        """Verifica se o limite de histórico é respeitado."""
+        """Verifica se o limite de histórico é respeitado.
+
+        MAX_HISTORY_SIZE representa pares de mensagens (usuário + assistente).
+        O limite real de mensagens individuais é MAX_HISTORY_SIZE * 2.
+        """
         from utils.config import config
 
         manager = ConversationManager()
@@ -146,7 +150,8 @@ class TestConversationManager:
             manager.add_user_message(f"Mensagem {i}")
             manager.add_assistant_message(f"Resposta {i}")
 
-        assert len(manager.messages) <= config.MAX_HISTORY_SIZE + 1
+        max_messages = config.MAX_HISTORY_SIZE * 2
+        assert len(manager.messages) <= max_messages + 1
 
     def test_sanitize_filename(self):
         """Verifica se nomes de arquivo são sanitizados."""
@@ -296,6 +301,29 @@ class TestLoadFromFile:
                 manager.load_from_file("nonexistent.json")
 
             assert "não encontrado" in str(exc_info.value)
+
+    def test_load_from_file_non_dict_root(self, tmp_path):
+        """JSON com raiz não-dicionário deve levantar ConversationLoadError."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "array_root.json"
+        test_file.write_text("[1, 2, 3]", encoding="utf-8")
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("array_root.json")
+
+            assert "estrutura" in str(exc_info.value).lower()
 
     def test_load_from_file_invalid_json(self, tmp_path):
         """JSON inválido deve levantar ConversationLoadError."""
@@ -733,3 +761,160 @@ class TestUnicodeAndLargeMessages:
             manager.load_from_file("too_large.json")
 
         assert "tamanho máximo" in str(exc_info.value)
+
+
+class TestMessageValidation:
+    """Testes para validação de mensagens."""
+
+    @patch("utils.conversation.config")
+    def test_add_user_message_non_string_raises_error(self, mock_config):
+        """Conteúdo não-string deve levantar TypeError."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        with pytest.raises(TypeError) as exc_info:
+            manager.add_user_message(123)
+
+        assert "string" in str(exc_info.value)
+
+    @patch("utils.conversation.config")
+    def test_add_assistant_message_non_string_raises_error(self, mock_config):
+        """Conteúdo não-string deve levantar TypeError."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+
+        with pytest.raises(TypeError) as exc_info:
+            manager.add_assistant_message(["not", "a", "string"])
+
+        assert "string" in str(exc_info.value)
+
+    @patch("utils.conversation.config")
+    def test_add_user_message_too_large_raises_error(self, mock_config):
+        """Mensagem muito grande deve levantar ValueError."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+        large_content = "x" * (MAX_MESSAGE_CONTENT_SIZE + 1)
+
+        with pytest.raises(ValueError) as exc_info:
+            manager.add_user_message(large_content)
+
+        assert "tamanho máximo" in str(exc_info.value)
+
+    @patch("utils.conversation.config")
+    def test_add_assistant_message_too_large_raises_error(self, mock_config):
+        """Mensagem muito grande deve levantar ValueError."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+        large_content = "x" * (MAX_MESSAGE_CONTENT_SIZE + 1)
+
+        with pytest.raises(ValueError) as exc_info:
+            manager.add_assistant_message(large_content)
+
+        assert "tamanho máximo" in str(exc_info.value)
+
+    @patch("utils.conversation.config")
+    def test_add_message_at_size_limit_succeeds(self, mock_config):
+        """Mensagem exatamente no limite deve ser aceita."""
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+        mock_config.MAX_HISTORY_SIZE = 50
+
+        manager = ConversationManager()
+        content_at_limit = "x" * MAX_MESSAGE_CONTENT_SIZE
+
+        manager.add_user_message(content_at_limit)
+        assert manager.message_count() == 1
+
+
+class TestConcurrentSaveOperations:
+    """Testes para operações de salvamento concorrentes."""
+
+    def test_concurrent_save_to_different_files(self, tmp_path, monkeypatch):
+        """Salvamentos concorrentes em arquivos diferentes devem funcionar."""
+        import threading
+        monkeypatch.chdir(tmp_path)
+
+        manager = ConversationManager()
+        manager.add_user_message("Test message")
+        manager.add_assistant_message("Test response")
+
+        errors = []
+        saved_paths = []
+
+        def save_file(filename):
+            try:
+                path = manager.save_to_file(filename)
+                saved_paths.append(path)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [
+            threading.Thread(target=save_file, args=(f"history_{i}.json",))
+            for i in range(5)
+        ]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert len(saved_paths) == 5
+        for path in saved_paths:
+            assert os.path.exists(path)
+
+    def test_concurrent_save_same_file(self, tmp_path, monkeypatch):
+        """Salvamentos concorrentes no mesmo arquivo devem ser seguros."""
+        import threading
+        monkeypatch.chdir(tmp_path)
+
+        manager = ConversationManager()
+        manager.add_user_message("Test message")
+
+        errors = []
+        success_count = [0]
+
+        def save_file():
+            try:
+                manager.save_to_file("shared.json")
+                success_count[0] += 1
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=save_file) for _ in range(10)]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert success_count[0] == 10
+        assert os.path.exists(tmp_path / "history" / "shared.json")

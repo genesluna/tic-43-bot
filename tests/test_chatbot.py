@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, call
-from chatbot import handle_command, main
+from chatbot import handle_command, main, CommandResult
 
 
 class TestHandleCommand:
@@ -15,34 +15,34 @@ class TestHandleCommand:
         self.mock_display = MagicMock()
 
     def test_exit_command_sair(self):
-        """Verifica se 'sair' retorna False para encerrar."""
+        """Verifica se 'sair' retorna EXIT para encerrar."""
         result = handle_command(
             "sair",
             self.mock_conversation,
             self.mock_client,
             self.mock_display,
         )
-        assert result is False
+        assert result == CommandResult.EXIT
 
     def test_exit_command_exit(self):
-        """Verifica se 'exit' retorna False para encerrar."""
+        """Verifica se 'exit' retorna EXIT para encerrar."""
         result = handle_command(
             "exit",
             self.mock_conversation,
             self.mock_client,
             self.mock_display,
         )
-        assert result is False
+        assert result == CommandResult.EXIT
 
     def test_exit_command_quit(self):
-        """Verifica se 'quit' retorna False para encerrar."""
+        """Verifica se 'quit' retorna EXIT para encerrar."""
         result = handle_command(
             "quit",
             self.mock_conversation,
             self.mock_client,
             self.mock_display,
         )
-        assert result is False
+        assert result == CommandResult.EXIT
 
     def test_clear_command_limpar(self):
         """Verifica se '/limpar' limpa o histórico."""
@@ -52,7 +52,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_conversation.clear.assert_called_once()
         self.mock_display.show_success.assert_called_once()
 
@@ -64,7 +64,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_conversation.clear.assert_called_once()
 
     def test_save_command_success(self):
@@ -76,7 +76,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_conversation.save_to_file.assert_called_once()
         self.mock_display.show_success.assert_called_once()
 
@@ -89,7 +89,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
     def test_help_command(self):
@@ -100,7 +100,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_help.assert_called_once()
 
     def test_help_command_english(self):
@@ -111,7 +111,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_help.assert_called_once()
 
     def test_model_command(self):
@@ -123,7 +123,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_client.get_model.assert_called_once()
         self.mock_display.show_model_info.assert_called_once_with("openai/gpt-4o-mini")
 
@@ -135,7 +135,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_client.set_model.assert_called_once_with("openai/gpt-4")
         self.mock_display.show_model_changed.assert_called_once_with("openai/gpt-4")
 
@@ -148,7 +148,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
     def test_model_command_preserves_argument_case(self):
@@ -159,7 +159,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_client.set_model.assert_called_once_with("OpenAI/GPT-4o-Mini")
 
     def test_list_command(self):
@@ -171,7 +171,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_conversation.list_history_files.assert_called_once()
         self.mock_display.show_history_list.assert_called_once_with([])
 
@@ -184,7 +184,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_history_list.assert_called_once()
 
     def test_load_command_with_file(self):
@@ -196,7 +196,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_conversation.load_from_file.assert_called_once_with("test.json")
         self.mock_display.show_success.assert_called_once()
 
@@ -208,7 +208,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
     def test_load_command_with_error(self):
@@ -221,18 +221,18 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
-    def test_regular_message_returns_none(self):
-        """Verifica se mensagem normal retorna None."""
+    def test_regular_message_returns_not_command(self):
+        """Verifica se mensagem normal retorna NOT_COMMAND."""
         result = handle_command(
             "Olá, como vai?",
             self.mock_conversation,
             self.mock_client,
             self.mock_display,
         )
-        assert result is None
+        assert result == CommandResult.NOT_COMMAND
 
     def test_command_case_insensitive(self):
         """Verifica se comandos são case-insensitive."""
@@ -242,7 +242,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is False
+        assert result == CommandResult.EXIT
 
     def test_command_with_whitespace(self):
         """Verifica se comandos funcionam com espaços."""
@@ -252,7 +252,7 @@ class TestHandleCommand:
             self.mock_client,
             self.mock_display,
         )
-        assert result is True
+        assert result == CommandResult.CONTINUE
         self.mock_display.show_help.assert_called_once()
 
 

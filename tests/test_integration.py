@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from io import StringIO
 
-from chatbot import main, handle_command
+from chatbot import main, handle_command, CommandResult
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager
 from utils.display import Display
@@ -75,7 +75,11 @@ class TestConversationFlow:
             assert conversation.message_count() == initial_count - 1
 
     def test_conversation_history_limit(self):
-        """Testa que histórico respeita limite configurado."""
+        """Testa que histórico respeita limite configurado.
+
+        MAX_HISTORY_SIZE representa pares de mensagens (usuário + assistente).
+        O limite real de mensagens individuais é MAX_HISTORY_SIZE * 2.
+        """
         conversation = ConversationManager()
 
         for i in range(100):
@@ -83,7 +87,8 @@ class TestConversationFlow:
             conversation.add_assistant_message(f"Resposta {i}")
 
         from utils.config import config
-        assert len(conversation.messages) <= config.MAX_HISTORY_SIZE + 1
+        max_messages = config.MAX_HISTORY_SIZE * 2
+        assert len(conversation.messages) <= max_messages + 1
 
 
 class TestMainIntegration:
@@ -181,7 +186,7 @@ class TestCommandIntegration:
 
         for cmd in ["sair", "exit", "quit", "SAIR", "EXIT", "QUIT"]:
             result = handle_command(cmd, conversation, client, display)
-            assert result is False
+            assert result == CommandResult.EXIT
 
     def test_all_clear_commands(self):
         """Testa todos os comandos de limpar."""
@@ -193,7 +198,7 @@ class TestCommandIntegration:
             conversation.reset_mock()
             display.reset_mock()
             result = handle_command(cmd, conversation, client, display)
-            assert result is True
+            assert result == CommandResult.CONTINUE
             conversation.clear.assert_called_once()
 
     def test_save_command_creates_file(self, tmp_path, monkeypatch):
@@ -209,7 +214,7 @@ class TestCommandIntegration:
 
         result = handle_command("/salvar", conversation, client, display)
 
-        assert result is True
+        assert result == CommandResult.CONTINUE
         display.show_success.assert_called_once()
 
         history_dir = tmp_path / "history"

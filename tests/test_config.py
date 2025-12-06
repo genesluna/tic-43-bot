@@ -1,10 +1,11 @@
 """Testes para o módulo de configuração."""
 
 import os
+import threading
 import pytest
 from unittest.mock import patch
 
-from utils.config import Config, ConfigurationError, config
+from utils.config import Config, ConfigurationError, config, _ThreadSafeCachedProperty
 
 
 class TestConfig:
@@ -240,3 +241,97 @@ class TestLazyEvaluation:
 
         assert config1.OPENROUTER_API_KEY == "key1"
         assert config2.OPENROUTER_API_KEY == "key2"
+
+
+class TestThreadSafeCachedProperty:
+    """Testes para o descriptor _ThreadSafeCachedProperty."""
+
+    def test_thread_safe_initial_evaluation(self):
+        """Avaliação inicial deve ser thread-safe."""
+        call_count = 0
+        call_lock = threading.Lock()
+
+        class TestClass:
+            @_ThreadSafeCachedProperty
+            def expensive_prop(self):
+                nonlocal call_count
+                with call_lock:
+                    call_count += 1
+                return "value"
+
+        instance = TestClass()
+        results = []
+        errors = []
+
+        def access_property():
+            try:
+                results.append(instance.expensive_prop)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=access_property) for _ in range(20)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert call_count == 1
+        assert all(r == "value" for r in results)
+
+    def test_descriptor_returns_self_on_class_access(self):
+        """Acesso via classe deve retornar o descriptor."""
+
+        class TestClass:
+            @_ThreadSafeCachedProperty
+            def prop(self):
+                return "value"
+
+        assert isinstance(TestClass.prop, _ThreadSafeCachedProperty)
+
+    def test_concurrent_access_different_instances(self):
+        """Instâncias diferentes devem ter caches independentes."""
+        call_counts = {}
+        call_lock = threading.Lock()
+
+        class TestClass:
+            def __init__(self, name):
+                self.name = name
+
+            @_ThreadSafeCachedProperty
+            def prop(self):
+                with call_lock:
+                    call_counts[self.name] = call_counts.get(self.name, 0) + 1
+                return f"value_{self.name}"
+
+        instances = [TestClass(f"inst_{i}") for i in range(5)]
+        results = []
+        errors = []
+
+        def access_all():
+            try:
+                for inst in instances:
+                    results.append((inst.name, inst.prop))
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=access_all) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        for name in call_counts:
+            assert call_counts[name] == 1
+
+    def test_set_name_called(self):
+        """__set_name__ deve ser chamado com o nome do atributo."""
+
+        class TestClass:
+            @_ThreadSafeCachedProperty
+            def my_property(self):
+                return "value"
+
+        prop = TestClass.__dict__["my_property"]
+        assert prop.attr_name == "my_property"

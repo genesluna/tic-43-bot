@@ -1,9 +1,12 @@
 """Testes para o módulo de API."""
 
+import gc
 import pytest
+import threading
+import time
 from unittest.mock import patch, MagicMock
 import httpx
-from utils.api import OpenRouterClient, APIError, RateLimitError
+from utils.api import OpenRouterClient, APIError, RateLimitError, StreamingResponse
 
 
 class TestOpenRouterClient:
@@ -41,6 +44,15 @@ class TestOpenRouterClient:
         client.set_model(new_model)
 
         assert client.get_model() == new_model
+
+    def test_set_model_none(self):
+        """Verifica se None levanta ValueError."""
+        client = OpenRouterClient()
+
+        with pytest.raises(ValueError) as exc_info:
+            client.set_model(None)
+
+        assert "string não vazia" in str(exc_info.value)
 
     def test_set_model_empty_string(self):
         """Verifica se string vazia levanta ValueError."""
@@ -665,3 +677,456 @@ class TestMessageValidation:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ])
+
+    def test_validate_messages_content_too_large(self):
+        """Verifica erro quando conteúdo excede tamanho máximo."""
+        from utils.api import MAX_MESSAGE_CONTENT_SIZE
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        large_content = "x" * (MAX_MESSAGE_CONTENT_SIZE + 1)
+
+        with pytest.raises(APIError) as exc_info:
+            client._validate_messages([{"role": "user", "content": large_content}])
+
+        assert "tamanho máximo" in str(exc_info.value)
+
+    def test_validate_messages_content_at_limit(self):
+        """Verifica que conteúdo exatamente no limite é aceito."""
+        from utils.api import MAX_MESSAGE_CONTENT_SIZE
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        content_at_limit = "x" * MAX_MESSAGE_CONTENT_SIZE
+
+        # Should not raise
+        client._validate_messages([{"role": "user", "content": content_at_limit}])
+
+
+class TestStreamingResponse:
+    """Testes para a classe StreamingResponse."""
+
+    def test_init(self):
+        """Verifica inicialização da StreamingResponse."""
+        client = OpenRouterClient()
+        gen = iter(["chunk1", "chunk2"])
+        response = StreamingResponse(client, gen)
+
+        assert response._client is client
+        assert response._closed is False
+
+    def test_repr(self):
+        """Verifica representação string."""
+        client = OpenRouterClient()
+        gen = iter([])
+        response = StreamingResponse(client, gen)
+
+        assert "StreamingResponse" in repr(response)
+        assert "closed=False" in repr(response)
+
+    def test_iteration(self):
+        """Verifica que iteração funciona corretamente."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        chunks = ["chunk1", "chunk2", "chunk3"]
+        gen = iter(chunks)
+        response = StreamingResponse(client, gen)
+
+        result = list(response)
+
+        assert result == chunks
+        assert response._closed is True
+        assert client._active_requests == 0
+
+    def test_cleanup_on_exhaustion(self):
+        """Verifica cleanup quando generator é completamente consumido."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b"]))
+
+        list(response)
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_cleanup_on_exception(self):
+        """Verifica cleanup quando exceção ocorre durante iteração."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+
+        def failing_generator():
+            yield "first"
+            raise ValueError("Test error")
+
+        response = StreamingResponse(client, failing_generator())
+
+        with pytest.raises(ValueError):
+            list(response)
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_cleanup_idempotent(self):
+        """Verifica que _cleanup é idempotente."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter([]))
+
+        response._cleanup()
+        response._cleanup()
+        response._cleanup()
+
+        assert client._active_requests == 0
+
+    def test_cleanup_thread_safe(self):
+        """Verifica que _cleanup é thread-safe com chamadas concorrentes."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b", "c"]))
+        errors = []
+
+        def call_cleanup():
+            try:
+                for _ in range(10):
+                    response._cleanup()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=call_cleanup) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_close_method(self):
+        """Verifica método close() explícito."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b", "c"]))
+
+        next(response)
+        response.close()
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_iteration_after_close_raises_stop_iteration(self):
+        """Verifica que iteração após close levanta StopIteration."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b"]))
+
+        next(response)
+        response.close()
+
+        with pytest.raises(StopIteration):
+            next(response)
+
+    def test_del_triggers_cleanup(self):
+        """Verifica que __del__ dispara cleanup."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b"]))
+
+        next(response)
+        del response
+        gc.collect()
+
+        assert client._active_requests == 0
+
+
+class TestStreamingResponseCleanup:
+    """Testes de cleanup do StreamingResponse em cenários reais."""
+
+    @patch("utils.api.httpx.Client")
+    def test_abandoned_generator_cleanup(self, mock_client_class):
+        """Verifica cleanup quando generator é abandonado."""
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 200
+        mock_stream_response.iter_lines.return_value = iter([
+            'data: {"choices": [{"delta": {"content": "chunk1"}}]}',
+            'data: {"choices": [{"delta": {"content": "chunk2"}}]}',
+            'data: {"choices": [{"delta": {"content": "chunk3"}}]}',
+            'data: [DONE]',
+        ])
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        response = client.send_message_stream([{"role": "user", "content": "test"}])
+        next(response)
+        del response
+        gc.collect()
+
+        assert client._active_requests == 0
+
+    @patch("utils.api.httpx.Client")
+    def test_partial_consumption_cleanup(self, mock_client_class):
+        """Verifica cleanup após consumo parcial do generator."""
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 200
+        mock_stream_response.iter_lines.return_value = iter([
+            'data: {"choices": [{"delta": {"content": "1"}}]}',
+            'data: {"choices": [{"delta": {"content": "2"}}]}',
+            'data: {"choices": [{"delta": {"content": "3"}}]}',
+            'data: [DONE]',
+        ])
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        response = client.send_message_stream([{"role": "user", "content": "test"}])
+        next(response)
+        next(response)
+        response.close()
+
+        assert client._active_requests == 0
+
+
+class TestConcurrentAPIAccess:
+    """Testes de concorrência para o cliente API."""
+
+    def test_concurrent_get_client(self):
+        """Verifica que _get_client é thread-safe."""
+        client = OpenRouterClient()
+        clients_obtained = []
+        errors = []
+
+        def get_client():
+            try:
+                c = client._get_client()
+                clients_obtained.append(c)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=get_client) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert len(clients_obtained) == 10
+        assert all(c is clients_obtained[0] for c in clients_obtained)
+
+        client.close()
+
+    def test_concurrent_request_counting(self):
+        """Verifica que contagem de requisições é thread-safe."""
+        client = OpenRouterClient()
+        errors = []
+
+        def increment_decrement():
+            try:
+                for _ in range(100):
+                    client._begin_request()
+                    time.sleep(0.001)
+                    client._end_request()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=increment_decrement) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert client._active_requests == 0
+
+    @patch("utils.api.time.sleep")
+    def test_close_waits_for_active_requests(self, mock_sleep):
+        """Verifica que close() espera requisições ativas."""
+        client = OpenRouterClient()
+        client._active_requests = 2
+        close_completed = threading.Event()
+
+        def simulate_request_completion():
+            time.sleep(0.1)
+            with client._requests_lock:
+                client._active_requests = 0
+
+        def close_client():
+            mock_sleep.side_effect = lambda x: time.sleep(0.05)
+            client.close()
+            close_completed.set()
+
+        request_thread = threading.Thread(target=simulate_request_completion)
+        close_thread = threading.Thread(target=close_client)
+
+        request_thread.start()
+        close_thread.start()
+
+        request_thread.join()
+        close_thread.join()
+
+        assert close_completed.is_set()
+        assert client._client is None
+
+
+class TestSanitizeErrorMessage:
+    """Testes para sanitização de mensagens de erro."""
+
+    def test_sanitize_empty_response(self):
+        """Resposta vazia deve retornar mensagem padrão."""
+        client = OpenRouterClient()
+        result = client._sanitize_error_message("")
+        assert result == "Sem detalhes disponíveis"
+
+    def test_sanitize_none_response(self):
+        """None deve retornar mensagem padrão."""
+        client = OpenRouterClient()
+        result = client._sanitize_error_message(None)
+        assert result == "Sem detalhes disponíveis"
+
+    def test_sanitize_truncates_long_message(self):
+        """Mensagens longas devem ser truncadas."""
+        client = OpenRouterClient()
+        long_message = "x" * 200
+        result = client._sanitize_error_message(long_message)
+        assert len(result) <= 103
+        assert result.endswith("...")
+
+    def test_sanitize_redacts_api_key(self):
+        """API keys devem ser redactadas."""
+        client = OpenRouterClient()
+        message = 'Error: api_key=sk-1234567890abcdef'
+        result = client._sanitize_error_message(message)
+        assert "sk-1234567890abcdef" not in result
+        assert "REDACTED" in result
+
+    def test_sanitize_redacts_token(self):
+        """Tokens devem ser redactados."""
+        client = OpenRouterClient()
+        message = 'Invalid token: abc123xyz'
+        result = client._sanitize_error_message(message)
+        assert "abc123xyz" not in result
+        assert "REDACTED" in result
+
+    def test_sanitize_redacts_bearer(self):
+        """Bearer tokens devem ser redactados."""
+        client = OpenRouterClient()
+        message = 'Authorization: Bearer sk-secret123'
+        result = client._sanitize_error_message(message)
+        assert "sk-secret123" not in result
+        assert "REDACTED" in result
+
+    def test_sanitize_redacts_password(self):
+        """Passwords devem ser redactados."""
+        client = OpenRouterClient()
+        message = 'password=mysecretpassword'
+        result = client._sanitize_error_message(message)
+        assert "mysecretpassword" not in result
+        assert "REDACTED" in result
+
+    def test_sanitize_case_insensitive(self):
+        """Redação deve ser case-insensitive."""
+        client = OpenRouterClient()
+        message = 'API_KEY=secret123 Token=abc'
+        result = client._sanitize_error_message(message)
+        assert "secret123" not in result
+        assert "abc" not in result
+
+
+class TestRateLimitErrorRepr:
+    """Testes para __repr__ do RateLimitError."""
+
+    def test_repr_with_retry_after(self):
+        """Verifica repr com retry_after."""
+        error = RateLimitError("Rate limit exceeded", retry_after=30.0)
+        result = repr(error)
+        assert "RateLimitError" in result
+        assert "Rate limit exceeded" in result
+        assert "retry_after=30.0" in result
+
+    def test_repr_without_retry_after(self):
+        """Verifica repr sem retry_after."""
+        error = RateLimitError("Rate limit exceeded")
+        result = repr(error)
+        assert "RateLimitError" in result
+        assert "retry_after=None" in result
+
+
+class TestStreamingNetworkErrors:
+    """Testes para erros de rede durante streaming."""
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_stream_network_error_mid_stream(self, mock_client_class):
+        """Verifica que erro de rede durante streaming é tratado corretamente."""
+        def failing_iterator():
+            yield 'data: {"choices": [{"delta": {"content": "Ola"}}]}'
+            yield 'data: {"choices": [{"delta": {"content": " mundo"}}]}'
+            raise httpx.ReadError("Connection lost")
+
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 200
+        mock_stream_response.iter_lines.return_value = failing_iterator()
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        response = client.send_message_stream([{"role": "user", "content": "test"}])
+
+        chunks = []
+        with pytest.raises(httpx.ReadError):
+            for chunk in response:
+                chunks.append(chunk)
+
+        assert len(chunks) == 2
+        assert chunks[0] == "Ola"
+        assert chunks[1] == " mundo"
+        assert client._active_requests == 0
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_stream_connection_reset_mid_stream(self, mock_client_class):
+        """Verifica que erro de conexão durante streaming é tratado corretamente."""
+        def connection_error_iterator():
+            yield 'data: {"choices": [{"delta": {"content": "Start"}}]}'
+            raise httpx.RemoteProtocolError("Connection reset")
+
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 200
+        mock_stream_response.iter_lines.return_value = connection_error_iterator()
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client._api_key = "test_key"
+
+        response = client.send_message_stream([{"role": "user", "content": "test"}])
+
+        chunks = []
+        with pytest.raises(httpx.RemoteProtocolError):
+            for chunk in response:
+                chunks.append(chunk)
+
+        assert len(chunks) == 1
+        assert client._active_requests == 0

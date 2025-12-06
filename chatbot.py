@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+from enum import Enum, auto
 from typing import Sequence
 
 from utils.api import OpenRouterClient, APIError
@@ -21,6 +22,23 @@ from utils.logging_config import setup_logging
 __version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
+
+
+class CommandResult(Enum):
+    """Resultado do processamento de comandos."""
+
+    CONTINUE = auto()  # Continua o loop principal
+    EXIT = auto()      # Encerra o chatbot
+    NOT_COMMAND = auto()  # Não é um comando, processar como mensagem
+
+
+def _extract_command_arg(user_input: str, commands: tuple[str, ...]) -> str | None:
+    """Extrai argumento de um comando, ou None se não for o comando."""
+    user_input_lower = user_input.lower().strip()
+    for cmd in commands:
+        if user_input_lower.startswith(cmd):
+            return user_input[len(cmd):].strip()
+    return None
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -58,85 +76,83 @@ def handle_command(
     conversation: ConversationManager,
     client: OpenRouterClient,
     display: Display,
-) -> bool | None:
+) -> CommandResult:
     """
     Processa comandos especiais.
 
     Returns:
-        True se deve continuar, False se deve sair, None se não é comando.
+        CommandResult indicando a ação a ser tomada.
     """
     user_input_lower = user_input.lower().strip()
 
     if user_input_lower in config.EXIT_COMMANDS:
         logger.info("Comando de saída recebido")
-        return False
+        return CommandResult.EXIT
 
     if user_input_lower in config.CLEAR_COMMANDS:
         conversation.clear()
         display.show_success("Histórico limpo!")
-        return True
+        return CommandResult.CONTINUE
 
     if user_input_lower in config.SAVE_COMMANDS:
         try:
             filename = conversation.save_to_file()
             display.show_success(f"Histórico salvo em: {filename}")
         except IOError as e:
-            logger.error(f"Falha ao salvar histórico: {e}")
+            logger.error("Falha ao salvar histórico: %s", e)
             display.show_error(str(e))
-        return True
+        return CommandResult.CONTINUE
 
     if user_input_lower in config.HELP_COMMANDS:
         display.show_help()
-        return True
+        return CommandResult.CONTINUE
 
-    for cmd in config.MODEL_COMMANDS:
-        if user_input_lower.startswith(cmd):
-            arg = user_input[len(cmd):].strip()
-            if not arg:
-                display.show_model_info(client.get_model())
-            else:
-                try:
-                    old_model = client.get_model()
-                    client.set_model(arg)
-                    logger.info(f"Modelo alterado: {old_model} -> {arg}")
-                    display.show_model_changed(arg)
-                except ValueError as e:
-                    logger.warning(f"Modelo inválido: {arg}")
-                    display.show_error(str(e))
-            return True
+    model_arg = _extract_command_arg(user_input, config.MODEL_COMMANDS)
+    if model_arg is not None:
+        if not model_arg:
+            display.show_model_info(client.get_model())
+        else:
+            try:
+                old_model = client.get_model()
+                client.set_model(model_arg)
+                logger.info("Modelo alterado: %s -> %s", old_model, model_arg)
+                display.show_model_changed(model_arg)
+            except ValueError as e:
+                logger.warning("Modelo inválido: %s", model_arg)
+                display.show_error(str(e))
+        return CommandResult.CONTINUE
 
     if user_input_lower in config.LIST_COMMANDS:
         files = conversation.list_history_files()
         display.show_history_list(files)
-        return True
+        return CommandResult.CONTINUE
 
-    for cmd in config.LOAD_COMMANDS:
-        if user_input_lower.startswith(cmd):
-            arg = user_input[len(cmd):].strip()
-            if not arg:
-                display.show_error("Uso: /carregar <nome_arquivo>")
-            else:
-                try:
-                    count = conversation.load_from_file(arg)
-                    display.show_success(f"Histórico carregado: {count} mensagens")
-                except ConversationLoadError as e:
-                    logger.error(f"Falha ao carregar histórico: {e}")
-                    display.show_error(str(e))
-            return True
+    load_arg = _extract_command_arg(user_input, config.LOAD_COMMANDS)
+    if load_arg is not None:
+        if not load_arg:
+            display.show_error("Uso: /carregar <nome_arquivo>")
+        else:
+            try:
+                count = conversation.load_from_file(load_arg)
+                display.show_success(f"Histórico carregado: {count} mensagens")
+            except ConversationLoadError as e:
+                logger.error("Falha ao carregar histórico: %s", e)
+                display.show_error(str(e))
+        return CommandResult.CONTINUE
 
-    return None
+    return CommandResult.NOT_COMMAND
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Loop principal do chatbot."""
     args = parse_args(argv)
 
-    if args.log_level:
-        os.environ["LOG_LEVEL"] = args.log_level
-    if args.log_file:
-        os.environ["LOG_FILE"] = args.log_file
-
-    setup_logging()
+    # Pass parameters directly to setup_logging instead of mutating os.environ
+    # This is thread-safe and avoids side effects on the global environment
+    setup_logging(
+        log_level=args.log_level,
+        log_file=args.log_file
+    )
     logger.info("Iniciando chatbot")
 
     display = Display()
@@ -144,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         config.validate()
     except ConfigurationError as e:
-        logger.error(f"Erro de configuração: {e}")
+        logger.error("Erro de configuração: %s", e)
         display.show_error(str(e))
         sys.exit(1)
 
@@ -176,9 +192,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
                 command_result = handle_command(user_input, conversation, client, display)
 
-                if command_result is False:
+                if command_result == CommandResult.EXIT:
                     break
-                elif command_result is True:
+                elif command_result == CommandResult.CONTINUE:
                     continue
 
                 conversation.add_user_message(user_input)
@@ -203,16 +219,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                         conversation.add_assistant_message(response)
 
                 except APIError as e:
-                    logger.error(f"Erro na API: {e}")
-                    try:
-                        display.stop_spinner()
-                    except RuntimeError as stop_err:
-                        logger.debug(f"Erro ao parar spinner: {stop_err}")
-                    try:
-                        if display.streaming.running:
-                            display.streaming.stop()
-                    except RuntimeError as stream_err:
-                        logger.debug(f"Erro ao parar streaming: {stream_err}")
+                    logger.error("Erro na API: %s", e)
+                    display.cleanup()
                     display.show_error(str(e))
                     conversation.remove_last_user_message()
 

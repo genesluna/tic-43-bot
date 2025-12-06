@@ -267,3 +267,39 @@ class TestSetupLogging:
                 setup_logging()
 
                 assert os.path.exists(os.path.dirname(log_file))
+
+    def test_setup_with_explicit_parameters(self):
+        """Verifica que parâmetros explícitos têm precedência sobre env vars."""
+        with patch.dict(os.environ, {"LOG_LEVEL": "ERROR"}, clear=True):
+            setup_logging(log_level="DEBUG")
+
+            root_logger = logging.getLogger()
+            # Parameter takes precedence over env var
+            assert root_logger.level == logging.DEBUG
+
+    def test_setup_with_log_level_parameter_only(self):
+        """Verifica que apenas parâmetro log_level funciona sem env var."""
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("LOG_LEVEL", None)
+
+            setup_logging(log_level="INFO")
+
+            root_logger = logging.getLogger()
+            handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)]
+            assert len(handlers) == 1
+            assert root_logger.level == logging.INFO
+
+    def test_setup_with_log_file_parameter(self):
+        """Verifica que parâmetro log_file funciona."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            log_file = f.name
+
+        try:
+            with patch.dict(os.environ, {}, clear=True):
+                setup_logging(log_file=log_file)
+
+                root_logger = logging.getLogger()
+                file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+                assert len(file_handlers) == 1
+        finally:
+            os.unlink(log_file)

@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+__all__ = ["StructuredFormatter", "ConsoleFormatter", "setup_logging"]
+
 
 class StructuredFormatter(logging.Formatter):
     """Formatter que produz logs em formato JSON estruturado."""
@@ -53,11 +55,30 @@ class ConsoleFormatter(logging.Formatter):
         )
 
 
-def setup_logging() -> None:
-    """Configura o sistema de logging baseado em variáveis de ambiente."""
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
-    log_format = os.getenv("LOG_FORMAT", "console").lower()
-    log_file = os.getenv("LOG_FILE", "")
+def setup_logging(
+    log_level: str | None = None,
+    log_file: str | None = None,
+    log_format: str | None = None
+) -> None:
+    """Configura o sistema de logging.
+
+    Args:
+        log_level: Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+                   Se None, usa variável de ambiente LOG_LEVEL ou WARNING.
+        log_file: Caminho do arquivo de log. Se None, usa LOG_FILE do ambiente.
+        log_format: Formato do log ('console' ou 'json').
+                    Se None, usa LOG_FORMAT do ambiente ou 'console'.
+
+    Note:
+        Parâmetros explícitos têm precedência sobre variáveis de ambiente.
+        Isso evita mutação de os.environ e é thread-safe.
+    """
+    # Track if logging was explicitly requested (param or env var)
+    log_level_requested = log_level is not None or os.getenv("LOG_LEVEL") is not None
+
+    log_level = (log_level or os.getenv("LOG_LEVEL", "WARNING")).upper()
+    log_format = (log_format or os.getenv("LOG_FORMAT", "console")).lower()
+    log_file = log_file if log_file is not None else os.getenv("LOG_FILE", "")
 
     numeric_level = getattr(logging, log_level, logging.WARNING)
 
@@ -72,7 +93,8 @@ def setup_logging() -> None:
     else:
         formatter = ConsoleFormatter()
 
-    if os.getenv("LOG_LEVEL"):
+    # Only add console handler if logging was explicitly requested
+    if log_level_requested:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setFormatter(formatter)
         console_handler.setLevel(numeric_level)
@@ -94,8 +116,8 @@ def setup_logging() -> None:
     if active_handlers:
         logger = logging.getLogger(__name__)
         logger.info(
-            f"Logging configurado: level={log_level}, format={log_format}, "
-            f"file={log_file or 'none'}"
+            "Logging configurado: level=%s, format=%s, file=%s",
+            log_level, log_format, log_file or 'none'
         )
 
 

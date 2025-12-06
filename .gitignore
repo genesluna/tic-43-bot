@@ -33,3 +33,6 @@ htmlcov/
 # Histórico de conversas salvas
 history/
 history_*.json
+
+#local files
+*.local.*

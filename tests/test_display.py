@@ -1,6 +1,8 @@
 """Testes para o módulo de exibição."""
 
 import pytest
+import threading
+import time
 from unittest.mock import patch, MagicMock
 from io import StringIO
 from utils.display import Display, RotatingSpinner, StreamingTextDisplay, THINKING_WORDS
@@ -432,6 +434,23 @@ class TestStreamingTextDisplay:
 
         assert streaming.running is False
 
+    def test_buffer_truncation_warning(self, capsys):
+        """Verifica se aviso de truncamento é exibido."""
+        from rich.console import Console
+        from utils.display import MAX_BUFFER_SIZE
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        streaming.start()
+        large_chunk = "x" * (MAX_BUFFER_SIZE + 100)
+        streaming.add_chunk(large_chunk)
+        streaming.stop()
+
+        captured = capsys.readouterr()
+        assert "truncada" in captured.out.lower()
+        assert "Dica" in captured.out
+
 
 class TestDisplayStreaming:
     """Testes para métodos de streaming no Display."""
@@ -544,8 +563,6 @@ class TestConcurrentScenarios:
 
     def test_rapid_start_stop_cycles(self):
         """Ciclos rápidos de start/stop não devem causar erro."""
-        import threading
-
         display = Display()
         errors = []
 
@@ -565,4 +582,190 @@ class TestConcurrentScenarios:
             t.join()
 
         assert len(errors) == 0
+        assert display.spinner.running is False
+
+    def test_concurrent_start_stop_spinner(self):
+        """Verifica que start/stop concorrentes não causam race condition."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+        errors = []
+        operations_completed = []
+
+        def start_stop_cycle():
+            try:
+                for _ in range(10):
+                    spinner.start()
+                    time.sleep(0.005)
+                    spinner.stop()
+                    operations_completed.append(True)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=start_stop_cycle) for _ in range(5)]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert spinner.running is False
+        assert len(operations_completed) == 50
+
+    def test_concurrent_streaming_start_stop(self):
+        """Verifica que start/stop de streaming é thread-safe."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+        errors = []
+
+        def start_add_stop():
+            try:
+                for _ in range(10):
+                    streaming.start()
+                    streaming.add_chunk("test")
+                    time.sleep(0.002)
+                    streaming.stop()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=start_add_stop) for _ in range(3)]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert streaming.running is False
+
+    def test_spinner_state_lock_protects_transitions(self):
+        """Verifica que state_lock protege transições de estado.
+
+        Este teste verifica que não há exceções nem estado corrompido
+        durante transições rápidas de start/stop, mesmo com observação
+        concorrente. O lock garante que operações de transição são atômicas.
+        """
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+        errors = []
+
+        def monitor_state():
+            """Monitor que tenta ler estado durante transições."""
+            for _ in range(100):
+                try:
+                    _ = spinner.running
+                    _ = spinner.thread
+                    _ = spinner.live
+                    _ = spinner._get_renderable()
+                except Exception as e:
+                    errors.append(f"Monitor error: {e}")
+                time.sleep(0.001)
+
+        def toggle_spinner():
+            for _ in range(20):
+                spinner.start()
+                spinner.stop()
+
+        monitor_thread = threading.Thread(target=monitor_state)
+        toggle_thread = threading.Thread(target=toggle_spinner)
+
+        monitor_thread.start()
+        toggle_thread.start()
+
+        toggle_thread.join()
+        monitor_thread.join()
+
+        assert len(errors) == 0
+        assert spinner.running is False
+
+    def test_streaming_buffer_integrity(self):
+        """Verifica integridade do buffer com escrita concorrente."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+        streaming.start()
+
+        def add_numbered_chunks(prefix):
+            for i in range(50):
+                streaming.add_chunk(f"{prefix}{i}")
+
+        threads = [
+            threading.Thread(target=add_numbered_chunks, args=(f"T{t}_",))
+            for t in range(5)
+        ]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        streaming.stop()
+        text = streaming.get_full_text()
+
+        for t in range(5):
+            for i in range(50):
+                assert f"T{t}_{i}" in text
+
+
+class TestDisplayCleanup:
+    """Testes para o método cleanup do Display."""
+
+    def test_cleanup_stops_running_spinner(self):
+        """Cleanup deve parar spinner em execução."""
+        display = Display()
+
+        display.start_spinner()
+        assert display.spinner.running is True
+
+        display.cleanup()
+        assert display.spinner.running is False
+
+    def test_cleanup_stops_running_streaming(self):
+        """Cleanup deve parar streaming em execução."""
+        display = Display()
+
+        display.start_streaming()
+        assert display.streaming.running is True
+
+        display.cleanup()
+        assert display.streaming.running is False
+
+    def test_cleanup_handles_both_running(self):
+        """Cleanup deve lidar com spinner e streaming rodando."""
+        display = Display()
+
+        display.start_spinner()
+        display.transition_spinner_to_streaming()
+        display.start_spinner()
+
+        display.cleanup()
+
+        assert display.spinner.running is False
+        assert display.streaming.running is False
+
+    def test_cleanup_safe_when_nothing_running(self):
+        """Cleanup não deve causar erro quando nada está rodando."""
+        display = Display()
+
+        display.cleanup()
+
+        assert display.spinner.running is False
+        assert display.streaming.running is False
+
+    def test_cleanup_multiple_times_safe(self):
+        """Cleanup pode ser chamado múltiplas vezes sem erro."""
+        display = Display()
+
+        display.start_spinner()
+        display.cleanup()
+        display.cleanup()
+        display.cleanup()
+
         assert display.spinner.running is False

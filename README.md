@@ -2,8 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-
-[![Tests](https://img.shields.io/badge/tests-222%20passed-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-277%20passed-brightgreen.svg)](#testes)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
@@ -115,25 +114,25 @@ Até logo!
 
 Todas as configurações são feitas via variáveis de ambiente no arquivo `.env`:
 
-| Variável             | Descrição                        | Padrão                                 |
-| -------------------- | -------------------------------- | -------------------------------------- |
-| `OPENROUTER_API_KEY` | Chave da API OpenRouter          | **(obrigatório)**                      |
-| `OPENROUTER_MODEL`   | Modelo de IA                     | `openai/gpt-4o-mini`                   |
-| `SYSTEM_PROMPT`      | Persona do chatbot               | `Você é um assistente virtual útil...` |
-| `RESPONSE_LANGUAGE`  | Idioma das respostas             | `português`                            |
-| `RESPONSE_LENGTH`    | Tamanho das respostas            | `conciso`                              |
-| `RESPONSE_TONE`      | Tom/estilo                       | `amigável`                             |
-| `RESPONSE_FORMAT`    | Formato do texto                 | `markdown`                             |
-| `MAX_MESSAGE_LENGTH` | Limite de caracteres/mensagem    | `10000`                                |
-| `MAX_HISTORY_SIZE`   | Máximo de mensagens no histórico | `50`                                   |
-| `HISTORY_DIR`        | Diretório para salvar histórico  | `./history`                            |
-| `LOG_LEVEL`          | Nível de logging                 | `WARNING`                              |
-| `LOG_FORMAT`         | Formato do log (console/json)    | `console`                              |
-| `LOG_FILE`           | Arquivo de log (opcional)        | -                                      |
-| `HTTP_CONNECT_TIMEOUT` | Timeout de conexão (segundos)  | `10.0`                                 |
-| `HTTP_READ_TIMEOUT`  | Timeout de leitura (segundos)    | `90.0`                                 |
-| `HTTP_WRITE_TIMEOUT` | Timeout de escrita (segundos)    | `10.0`                                 |
-| `HTTP_POOL_TIMEOUT`  | Timeout do pool (segundos)       | `10.0`                                 |
+| Variável               | Descrição                        | Padrão                                 |
+| ---------------------- | -------------------------------- | -------------------------------------- |
+| `OPENROUTER_API_KEY`   | Chave da API OpenRouter          | **(obrigatório)**                      |
+| `OPENROUTER_MODEL`     | Modelo de IA                     | `openai/gpt-4o-mini`                   |
+| `SYSTEM_PROMPT`        | Persona do chatbot               | `Você é um assistente virtual útil...` |
+| `RESPONSE_LANGUAGE`    | Idioma das respostas             | `português`                            |
+| `RESPONSE_LENGTH`      | Tamanho das respostas            | `conciso`                              |
+| `RESPONSE_TONE`        | Tom/estilo                       | `amigável`                             |
+| `RESPONSE_FORMAT`      | Formato do texto                 | `markdown`                             |
+| `MAX_MESSAGE_LENGTH`   | Limite de caracteres/mensagem    | `10000`                                |
+| `MAX_HISTORY_SIZE`     | Máximo de pares de conversa      | `25`                                   |
+| `HISTORY_DIR`          | Diretório para salvar histórico  | `./history`                            |
+| `LOG_LEVEL`            | Nível de logging                 | `WARNING`                              |
+| `LOG_FORMAT`           | Formato do log (console/json)    | `console`                              |
+| `LOG_FILE`             | Arquivo de log (opcional)        | -                                      |
+| `HTTP_CONNECT_TIMEOUT` | Timeout de conexão (segundos)    | `10.0`                                 |
+| `HTTP_READ_TIMEOUT`    | Timeout de leitura (segundos)    | `90.0`                                 |
+| `HTTP_WRITE_TIMEOUT`   | Timeout de escrita (segundos)    | `10.0`                                 |
+| `HTTP_POOL_TIMEOUT`    | Timeout do pool (segundos)       | `10.0`                                 |
 
 ### Exemplos de Personalização
 
@@ -181,7 +180,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 222 testes com cobertura abrangente.
+O projeto possui 277 testes com 93% de cobertura.
 
 ```bash
 # Executar testes

@@ -10,6 +10,8 @@ from typing import TypedDict
 
 from .config import config
 
+__all__ = ["ConversationManager", "ConversationLoadError", "Message", "MAX_MESSAGE_CONTENT_SIZE"]
+
 logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_CONTENT_SIZE = 100000
@@ -33,6 +35,9 @@ class ConversationManager:
         self.messages: list[Message] = []
         self.system_prompt = self._build_system_prompt()
         self._init_system_message()
+
+    def __repr__(self) -> str:
+        return f"ConversationManager(messages={len(self.messages)})"
 
     def _build_system_prompt(self) -> str:
         """Constrói o system prompt com as configurações de personalização."""
@@ -61,22 +66,37 @@ class ConversationManager:
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
     def _enforce_history_limit(self) -> None:
-        """Mantém apenas as N mensagens mais recentes + system prompt."""
-        max_size = config.MAX_HISTORY_SIZE
-        if len(self.messages) > max_size + 1:
-            self.messages = [self.messages[0]] + self.messages[-(max_size):]
+        """Mantém apenas os N pares de mensagens mais recentes + system prompt.
+
+        MAX_HISTORY_SIZE representa o número de pares de conversa (usuário + assistente).
+        O limite real de mensagens individuais é MAX_HISTORY_SIZE * 2.
+        """
+        max_messages = config.MAX_HISTORY_SIZE * 2
+        if len(self.messages) > max_messages + 1:
+            self.messages = [self.messages[0]] + self.messages[-(max_messages):]
+
+    def _validate_message_content(self, content: str) -> None:
+        """Valida o conteúdo de uma mensagem."""
+        if not isinstance(content, str):
+            raise TypeError("Conteúdo da mensagem deve ser uma string")
+        if len(content) > MAX_MESSAGE_CONTENT_SIZE:
+            raise ValueError(
+                f"Mensagem excede tamanho máximo ({MAX_MESSAGE_CONTENT_SIZE} caracteres)"
+            )
 
     def add_user_message(self, content: str) -> None:
         """Adiciona uma mensagem do usuário."""
+        self._validate_message_content(content)
         self.messages.append({"role": "user", "content": content})
         self._enforce_history_limit()
-        logger.debug(f"Mensagem do usuário adicionada ({len(content)} chars)")
+        logger.debug("Mensagem do usuário adicionada (%d chars)", len(content))
 
     def add_assistant_message(self, content: str) -> None:
         """Adiciona uma mensagem do assistente."""
+        self._validate_message_content(content)
         self.messages.append({"role": "assistant", "content": content})
         self._enforce_history_limit()
-        logger.debug(f"Mensagem do assistente adicionada ({len(content)} chars)")
+        logger.debug("Mensagem do assistente adicionada (%d chars)", len(content))
 
     def remove_last_user_message(self) -> str | None:
         """
@@ -146,19 +166,22 @@ class ConversationManager:
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
-            logger.info(f"Histórico salvo: {filepath} ({len(history['messages'])} mensagens)")
+            logger.info("Histórico salvo: %s (%d mensagens)", filepath, len(history['messages']))
             return str(filepath)
         except (OSError, PermissionError) as e:
-            logger.error(f"Falha ao salvar histórico: {e}")
+            logger.error("Falha ao salvar histórico: %s", e)
             raise IOError(f"Erro ao salvar arquivo: {e}") from e
 
     def message_count(self) -> int:
         """Retorna o número de mensagens (excluindo system)."""
         return sum(1 for msg in self.messages if msg["role"] != "system")
 
-    def list_history_files(self) -> list[tuple[str, str, str]]:
+    def list_history_files(self, limit: int = 100) -> list[tuple[str, str, str]]:
         """
         Lista arquivos de histórico disponíveis.
+
+        Args:
+            limit: Número máximo de arquivos a retornar.
 
         Returns:
             Lista de tuplas (nome_arquivo, timestamp, modelo) ordenada por data.
@@ -176,11 +199,15 @@ class ConversationManager:
                 timestamp = data.get("timestamp", "Desconhecido")
                 model = data.get("model", "Desconhecido")
                 files.append((filepath.name, timestamp, model))
-            except (json.JSONDecodeError, OSError):
+            except json.JSONDecodeError:
+                logger.debug("JSON inválido ignorado: %s", filepath)
+                continue
+            except OSError as e:
+                logger.warning("Erro ao ler arquivo de histórico %s: %s", filepath, e)
                 continue
 
         files.sort(key=lambda x: x[1], reverse=True)
-        return files
+        return files[:limit]
 
     def load_from_file(self, filename: str) -> int:
         """
@@ -199,7 +226,7 @@ class ConversationManager:
         path = Path(config.HISTORY_DIR) / safe_filename
 
         if not path.exists():
-            logger.warning(f"Tentativa de carregar arquivo inexistente: {path}")
+            logger.warning("Tentativa de carregar arquivo inexistente: %s", path)
             raise ConversationLoadError(f"Arquivo não encontrado: {path}")
 
         try:
@@ -235,5 +262,5 @@ class ConversationManager:
             self.messages.append({"role": msg["role"], "content": msg["content"]})
 
         self._enforce_history_limit()
-        logger.info(f"Histórico carregado: {path} ({len(messages)} mensagens)")
+        logger.info("Histórico carregado: %s (%d mensagens)", path, len(messages))
         return len(messages)
