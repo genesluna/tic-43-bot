@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
 
-[![Tests](https://img.shields.io/badge/tests-165%20passed-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-222%20passed-brightgreen.svg)](#testes)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
@@ -130,6 +130,10 @@ Todas as configurações são feitas via variáveis de ambiente no arquivo `.env
 | `LOG_LEVEL`          | Nível de logging                 | `WARNING`                              |
 | `LOG_FORMAT`         | Formato do log (console/json)    | `console`                              |
 | `LOG_FILE`           | Arquivo de log (opcional)        | -                                      |
+| `HTTP_CONNECT_TIMEOUT` | Timeout de conexão (segundos)  | `10.0`                                 |
+| `HTTP_READ_TIMEOUT`  | Timeout de leitura (segundos)    | `90.0`                                 |
+| `HTTP_WRITE_TIMEOUT` | Timeout de escrita (segundos)    | `10.0`                                 |
+| `HTTP_POOL_TIMEOUT`  | Timeout do pool (segundos)       | `10.0`                                 |
 
 ### Exemplos de Personalização
 
@@ -177,7 +181,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 165 testes com 93% de cobertura.
+O projeto possui 222 testes com cobertura abrangente.
 
 ```bash
 # Executar testes
@@ -201,12 +205,13 @@ chatbot-tic43/
 │   ├── display.py         # Interface rica do terminal
 │   └── logging_config.py  # Configuração de logging estruturado
 ├── tests/
-│   ├── test_api.py        # Testes do cliente API
-│   ├── test_chatbot.py    # Testes do módulo principal
-│   ├── test_config.py     # Testes de configuração
-│   ├── test_conversation.py
-│   ├── test_display.py
-│   └── test_integration.py
+│   ├── test_api.py            # Testes do cliente API
+│   ├── test_chatbot.py        # Testes do módulo principal
+│   ├── test_config.py         # Testes de configuração
+│   ├── test_conversation.py   # Testes do gerenciador de conversa
+│   ├── test_display.py        # Testes da interface do terminal
+│   ├── test_integration.py    # Testes de integração
+│   └── test_logging_config.py # Testes do sistema de logging
 ├── requirements.txt       # Dependências de produção
 ├── requirements-dev.txt   # Dependências de desenvolvimento
 └── .env.example           # Template de configuração

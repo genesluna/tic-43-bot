@@ -1,6 +1,7 @@
 """Configurações do chatbot carregadas do ambiente."""
 
 import os
+from functools import cached_property
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,34 +11,8 @@ class ConfigurationError(Exception):
     """Erro de configuração do chatbot."""
 
 
-def _get_int_env(name: str, default: int) -> int:
-    """Obtém variável de ambiente como inteiro positivo com validação."""
-    raw_value = os.getenv(name, str(default))
-    try:
-        value = int(raw_value)
-    except ValueError:
-        raise ConfigurationError(f"{name} deve ser um número inteiro, recebido: '{raw_value}'")
-    if value <= 0:
-        raise ConfigurationError(f"{name} deve ser um inteiro positivo, recebido: '{value}'")
-    return value
-
-
 class Config:
-    """Classe de configuração do chatbot."""
-
-    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1/chat/completions"
-    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-
-    SYSTEM_PROMPT: str = os.getenv(
-        "SYSTEM_PROMPT",
-        "Você é um assistente virtual útil e amigável.",
-    )
-
-    RESPONSE_LANGUAGE: str = os.getenv("RESPONSE_LANGUAGE", "português")
-    RESPONSE_LENGTH: str = os.getenv("RESPONSE_LENGTH", "conciso")
-    RESPONSE_TONE: str = os.getenv("RESPONSE_TONE", "amigável")
-    RESPONSE_FORMAT: str = os.getenv("RESPONSE_FORMAT", "markdown")
+    """Classe de configuração do chatbot com avaliação lazy."""
 
     EXIT_COMMANDS: tuple[str, ...] = ("sair", "exit", "quit")
     CLEAR_COMMANDS: tuple[str, ...] = ("/limpar", "/clear")
@@ -46,24 +21,112 @@ class Config:
     MODEL_COMMANDS: tuple[str, ...] = ("/modelo",)
     LOAD_COMMANDS: tuple[str, ...] = ("/carregar", "/load")
     LIST_COMMANDS: tuple[str, ...] = ("/listar", "/list")
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1/chat/completions"
 
-    MAX_MESSAGE_LENGTH: int = _get_int_env("MAX_MESSAGE_LENGTH", 10000)
-    MAX_HISTORY_SIZE: int = _get_int_env("MAX_HISTORY_SIZE", 50)
-    HISTORY_DIR: str = os.getenv("HISTORY_DIR", "./history")
+    @cached_property
+    def OPENROUTER_API_KEY(self) -> str:
+        return os.getenv("OPENROUTER_API_KEY", "")
 
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "WARNING")
-    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "console")
-    LOG_FILE: str = os.getenv("LOG_FILE", "")
+    @cached_property
+    def OPENROUTER_MODEL(self) -> str:
+        return os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
-    HTTP_CONNECT_TIMEOUT: float = float(os.getenv("HTTP_CONNECT_TIMEOUT", "10.0"))
-    HTTP_READ_TIMEOUT: float = float(os.getenv("HTTP_READ_TIMEOUT", "90.0"))
-    HTTP_WRITE_TIMEOUT: float = float(os.getenv("HTTP_WRITE_TIMEOUT", "10.0"))
-    HTTP_POOL_TIMEOUT: float = float(os.getenv("HTTP_POOL_TIMEOUT", "10.0"))
+    @cached_property
+    def SYSTEM_PROMPT(self) -> str:
+        return os.getenv(
+            "SYSTEM_PROMPT",
+            "Você é um assistente virtual útil e amigável.",
+        )
 
-    @classmethod
-    def validate(cls) -> None:
+    @cached_property
+    def RESPONSE_LANGUAGE(self) -> str:
+        return os.getenv("RESPONSE_LANGUAGE", "português")
+
+    @cached_property
+    def RESPONSE_LENGTH(self) -> str:
+        return os.getenv("RESPONSE_LENGTH", "conciso")
+
+    @cached_property
+    def RESPONSE_TONE(self) -> str:
+        return os.getenv("RESPONSE_TONE", "amigável")
+
+    @cached_property
+    def RESPONSE_FORMAT(self) -> str:
+        return os.getenv("RESPONSE_FORMAT", "markdown")
+
+    @cached_property
+    def MAX_MESSAGE_LENGTH(self) -> int:
+        return self._get_int_env("MAX_MESSAGE_LENGTH", 10000)
+
+    @cached_property
+    def MAX_HISTORY_SIZE(self) -> int:
+        return self._get_int_env("MAX_HISTORY_SIZE", 50)
+
+    @cached_property
+    def HISTORY_DIR(self) -> str:
+        return os.getenv("HISTORY_DIR", "./history")
+
+    @cached_property
+    def LOG_LEVEL(self) -> str:
+        return os.getenv("LOG_LEVEL", "WARNING")
+
+    @cached_property
+    def LOG_FORMAT(self) -> str:
+        return os.getenv("LOG_FORMAT", "console")
+
+    @cached_property
+    def LOG_FILE(self) -> str:
+        return os.getenv("LOG_FILE", "")
+
+    @cached_property
+    def HTTP_CONNECT_TIMEOUT(self) -> float:
+        return self._get_float_env("HTTP_CONNECT_TIMEOUT", 10.0)
+
+    @cached_property
+    def HTTP_READ_TIMEOUT(self) -> float:
+        return self._get_float_env("HTTP_READ_TIMEOUT", 90.0)
+
+    @cached_property
+    def HTTP_WRITE_TIMEOUT(self) -> float:
+        return self._get_float_env("HTTP_WRITE_TIMEOUT", 10.0)
+
+    @cached_property
+    def HTTP_POOL_TIMEOUT(self) -> float:
+        return self._get_float_env("HTTP_POOL_TIMEOUT", 10.0)
+
+    def _get_float_env(self, name: str, default: float) -> float:
+        """Obtém variável de ambiente como float positivo com validação."""
+        raw_value = os.getenv(name, str(default))
+        try:
+            value = float(raw_value)
+        except (ValueError, TypeError):
+            raise ConfigurationError(
+                f"{name} deve ser um número válido, recebido: '{raw_value}'"
+            )
+        if value <= 0:
+            raise ConfigurationError(
+                f"{name} deve ser um número positivo, recebido: '{value}'"
+            )
+        return value
+
+    def _get_int_env(self, name: str, default: int) -> int:
+        """Obtém variável de ambiente como inteiro positivo com validação."""
+        raw_value = os.getenv(name, str(default))
+        try:
+            value = int(raw_value)
+        except ValueError:
+            raise ConfigurationError(
+                f"{name} deve ser um número inteiro, recebido: '{raw_value}'"
+            )
+        if value <= 0:
+            raise ConfigurationError(
+                f"{name} deve ser um inteiro positivo, recebido: '{value}'"
+            )
+        return value
+
+    def validate(self) -> None:
         """Valida as configurações obrigatórias."""
-        if not cls.OPENROUTER_API_KEY:
+        if not self.OPENROUTER_API_KEY:
             raise ConfigurationError(
                 "OPENROUTER_API_KEY não configurada.\n"
                 "Configure no arquivo .env ou como variável de ambiente."

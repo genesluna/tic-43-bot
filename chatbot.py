@@ -15,7 +15,7 @@ from typing import Sequence
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
-from utils.config import config, Config, ConfigurationError
+from utils.config import config, ConfigurationError
 from utils.logging_config import setup_logging
 
 __version__ = "1.0.0"
@@ -142,7 +142,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     display = Display()
 
     try:
-        Config.validate()
+        config.validate()
     except ConfigurationError as e:
         logger.error(f"Erro de configuração: {e}")
         display.show_error(str(e))

@@ -143,6 +143,73 @@ class OpenRouterClient:
             if not isinstance(msg["content"], str):
                 raise APIError(f"Mensagem {i} tem content não-string.")
 
+    def _prepare_request(
+        self, messages: list[dict[str, str]], stream: bool = False
+    ) -> dict[str, Any]:
+        """Prepara e valida requisição para a API."""
+        if not self._api_key:
+            raise APIError(
+                "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
+            )
+        self._validate_messages(messages)
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+        }
+        if stream:
+            payload["stream"] = True
+        return payload
+
+    def _handle_response_error(
+        self, response: httpx.Response, attempt: int
+    ) -> tuple[bool, Exception | None]:
+        """
+        Trata erros de resposta HTTP.
+
+        Returns:
+            Tupla (should_proceed, exception).
+            should_proceed=True significa sucesso, proceder com parsing.
+            should_proceed=False com exception=None significa retry.
+            should_proceed=False com exception significa erro fatal.
+        """
+        if response.status_code == 401:
+            return False, APIError("Chave de API inválida. Verifique sua configuração.")
+
+        if response.status_code == 429:
+            retry_after, should_retry = self._handle_rate_limit(response, attempt)
+            if should_retry:
+                return False, None
+            return False, RateLimitError(
+                "Limite de requisições excedido após várias tentativas.",
+                retry_after=retry_after,
+            )
+
+        if response.status_code >= 400:
+            error_detail = self._sanitize_error_message(response.text)
+            return False, APIError(f"Erro na API ({response.status_code}): {error_detail}")
+
+        return True, None
+
+    def _handle_network_error(
+        self, error: Exception, attempt: int
+    ) -> tuple[bool, APIError]:
+        """Trata erros de rede (timeout, conexão)."""
+        if isinstance(error, httpx.TimeoutException):
+            last_error, should_retry = self._handle_transient_error(
+                "Timeout", "Tempo limite excedido. Verifique sua conexão.", attempt
+            )
+            return should_retry, last_error
+
+        if isinstance(error, httpx.ConnectError):
+            last_error, should_retry = self._handle_transient_error(
+                "Erro de conexão",
+                "Não foi possível conectar à API. Verifique sua conexão.",
+                attempt,
+            )
+            return should_retry, last_error
+
+        return False, APIError(f"Erro de rede: {error}")
+
     def send_message(self, messages: list[dict[str, str]]) -> str:
         """
         Envia mensagens para a API e retorna a resposta.
@@ -157,18 +224,7 @@ class OpenRouterClient:
             APIError: Em caso de erro na comunicação.
             RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
-        if not self._api_key:
-            raise APIError(
-                "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
-            )
-
-        self._validate_messages(messages)
-
-        payload = {
-            "model": self.model,
-            "messages": messages,
-        }
-
+        payload = self._prepare_request(messages)
         last_error: Exception | None = None
 
         for attempt in range(DEFAULT_MAX_RETRIES):
@@ -180,21 +236,11 @@ class OpenRouterClient:
                     json=payload,
                 )
 
-                if response.status_code == 401:
-                    raise APIError("Chave de API inválida. Verifique sua configuração.")
-
-                if response.status_code == 429:
-                    retry_after, should_retry = self._handle_rate_limit(response, attempt)
-                    if should_retry:
-                        continue
-                    raise RateLimitError(
-                        "Limite de requisições excedido após várias tentativas.",
-                        retry_after=retry_after,
-                    )
-
-                if response.status_code >= 400:
-                    error_detail = self._sanitize_error_message(response.text)
-                    raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
+                should_proceed, error = self._handle_response_error(response, attempt)
+                if error:
+                    raise error
+                if not should_proceed:
+                    continue
 
                 data = response.json()
 
@@ -208,16 +254,8 @@ class OpenRouterClient:
                 logger.debug(f"Resposta recebida ({len(content)} chars)")
                 return content
 
-            except httpx.TimeoutException:
-                last_error, should_retry = self._handle_transient_error(
-                    "Timeout", "Tempo limite excedido. Verifique sua conexão.", attempt
-                )
-                if should_retry:
-                    continue
-            except httpx.ConnectError:
-                last_error, should_retry = self._handle_transient_error(
-                    "Erro de conexão", "Não foi possível conectar à API. Verifique sua conexão.", attempt
-                )
+            except (httpx.TimeoutException, httpx.ConnectError) as e:
+                should_retry, last_error = self._handle_network_error(e, attempt)
                 if should_retry:
                     continue
 
@@ -225,7 +263,9 @@ class OpenRouterClient:
             raise last_error
         raise APIError("Erro desconhecido na comunicação com a API.")
 
-    def send_message_stream(self, messages: list[dict[str, str]]) -> Generator[str, None, None]:
+    def send_message_stream(
+        self, messages: list[dict[str, str]]
+    ) -> Generator[str, None, None]:
         """
         Envia mensagens para a API e retorna a resposta em streaming.
 
@@ -239,19 +279,7 @@ class OpenRouterClient:
             APIError: Em caso de erro na comunicação.
             RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
-        if not self._api_key:
-            raise APIError(
-                "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
-            )
-
-        self._validate_messages(messages)
-
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "stream": True,
-        }
-
+        payload = self._prepare_request(messages, stream=True)
         logger.debug(f"Iniciando streaming com {len(messages)} mensagens")
         last_error: Exception | None = None
 
@@ -264,22 +292,16 @@ class OpenRouterClient:
                     headers=self._get_headers(),
                     json=payload,
                 ) as response:
-                    if response.status_code == 401:
-                        raise APIError("Chave de API inválida. Verifique sua configuração.")
-
-                    if response.status_code == 429:
-                        retry_after, should_retry = self._handle_rate_limit(response, attempt)
-                        if should_retry:
-                            continue
-                        raise RateLimitError(
-                            "Limite de requisições excedido após várias tentativas.",
-                            retry_after=retry_after,
-                        )
-
                     if response.status_code >= 400:
-                        response.read()
-                        error_detail = self._sanitize_error_message(response.text)
-                        raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
+                        if response.status_code != 401:
+                            response.read()
+                        should_proceed, error = self._handle_response_error(
+                            response, attempt
+                        )
+                        if error:
+                            raise error
+                        if not should_proceed:
+                            continue
 
                     for line in response.iter_lines():
                         if not line or not line.startswith("data: "):
@@ -298,21 +320,15 @@ class OpenRouterClient:
                                 if content:
                                     yield content
                         except json.JSONDecodeError as e:
-                            logger.warning(f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}")
+                            logger.warning(
+                                f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}"
+                            )
                             continue
 
                     return
 
-            except httpx.TimeoutException:
-                last_error, should_retry = self._handle_transient_error(
-                    "Timeout", "Tempo limite excedido. Verifique sua conexão.", attempt
-                )
-                if should_retry:
-                    continue
-            except httpx.ConnectError:
-                last_error, should_retry = self._handle_transient_error(
-                    "Erro de conexão", "Não foi possível conectar à API. Verifique sua conexão.", attempt
-                )
+            except (httpx.TimeoutException, httpx.ConnectError) as e:
+                should_retry, last_error = self._handle_network_error(e, attempt)
                 if should_retry:
                     continue
 

@@ -6,11 +6,11 @@ import time
 import threading
 
 try:
-    import readline  # noqa: F401 - Unix/Linux input history/editing
+    import readline  # noqa: F401
     del readline
 except ImportError:
     try:
-        import pyreadline3  # noqa: F401 - Windows input history/editing
+        import pyreadline3  # noqa: F401
         del pyreadline3
     except ImportError:
         pass
@@ -22,11 +22,11 @@ from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
-SPINNER_REFRESH_RATE = 12  # Hz - spinner animation refresh rate
-STREAMING_REFRESH_RATE = 10  # Hz - streaming text refresh rate
-WORD_CHANGE_INTERVAL = 5.0  # seconds - interval between rotating words
-ANIMATION_FRAME_INTERVAL = 0.08  # seconds - delay between animation frames
-THREAD_JOIN_TIMEOUT = 0.2  # seconds - max wait for thread cleanup
+SPINNER_REFRESH_RATE = 12  # Hz - taxa de atualização do spinner
+STREAMING_REFRESH_RATE = 10  # Hz - taxa de atualização do streaming
+WORD_CHANGE_INTERVAL = 5.0  # segundos - intervalo entre rotação de palavras
+ANIMATION_FRAME_INTERVAL = 0.08  # segundos - atraso entre frames da animação
+THREAD_JOIN_TIMEOUT = 0.2  # segundos - tempo máximo para encerrar thread
 
 THINKING_WORDS: list[str] = [
     "Pensando",

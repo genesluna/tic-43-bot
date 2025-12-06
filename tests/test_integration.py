@@ -90,12 +90,11 @@ class TestMainIntegration:
     """Testes de integração da função main."""
 
     @patch("chatbot.Display")
-    @patch("chatbot.Config")
+    @patch("chatbot.config")
     @patch("chatbot.OpenRouterClient")
     @patch("chatbot.ConversationManager")
-    @patch("chatbot.config")
     def test_complete_session(
-        self, mock_config, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
     ):
         """Testa sessão completa: banner, mensagem, resposta, saída."""
         mock_config.MAX_MESSAGE_LENGTH = 10000
@@ -104,6 +103,8 @@ class TestMainIntegration:
         mock_config.SAVE_COMMANDS = ("/salvar",)
         mock_config.HELP_COMMANDS = ("/ajuda",)
         mock_config.MODEL_COMMANDS = ("/modelo",)
+        mock_config.LIST_COMMANDS = ("/listar",)
+        mock_config.LOAD_COMMANDS = ("/carregar",)
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["Olá", "sair"]
@@ -133,12 +134,11 @@ class TestMainIntegration:
         mock_display.show_goodbye.assert_called_once()
 
     @patch("chatbot.Display")
-    @patch("chatbot.Config")
+    @patch("chatbot.config")
     @patch("chatbot.OpenRouterClient")
     @patch("chatbot.ConversationManager")
-    @patch("chatbot.config")
     def test_session_with_commands(
-        self, mock_config, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
     ):
         """Testa sessão com comandos especiais."""
         mock_config.MAX_MESSAGE_LENGTH = 10000
@@ -147,6 +147,8 @@ class TestMainIntegration:
         mock_config.SAVE_COMMANDS = ("/salvar",)
         mock_config.HELP_COMMANDS = ("/ajuda",)
         mock_config.MODEL_COMMANDS = ("/modelo",)
+        mock_config.LIST_COMMANDS = ("/listar",)
+        mock_config.LOAD_COMMANDS = ("/carregar",)
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["/ajuda", "/limpar", "/modelo", "sair"]
