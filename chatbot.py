@@ -80,13 +80,15 @@ def main():
             conversation.add_user_message(user_input)
 
             try:
-                with display.get_spinner():
-                    response = client.send_message(conversation.get_messages())
+                display.start_spinner()
+                response = client.send_message(conversation.get_messages())
+                display.stop_spinner()
 
                 conversation.add_assistant_message(response)
                 display.show_bot_message(response)
 
             except APIError as e:
+                display.stop_spinner()
                 display.show_error(str(e))
                 conversation.messages.pop()
 
