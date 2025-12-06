@@ -47,14 +47,20 @@ class RotatingSpinner:
         self.word_index = 0
         self.word_change_interval = 5.0
         self.last_word_change = 0
+        self.start_time = 0
 
     def _get_renderable(self):
         char = self.spinner_chars[self.char_index]
         word = THINKING_WORDS[self.word_index]
+        elapsed = int(time.time() - self.start_time)
         return Text.assemble(
             (char, "cyan"),
             " ",
-            (f"{word}...", "dim"),
+            (f"{word}…", "dim"),
+            (" (esc para interromper", "dim"),
+            (" · ", "dim"),
+            (f"{elapsed}s", "dim"),
+            (")", "dim"),
         )
 
     def _animate(self):
@@ -70,6 +76,7 @@ class RotatingSpinner:
 
     def start(self):
         self.running = True
+        self.start_time = time.time()
         self.word_index = random.randint(0, len(THINKING_WORDS) - 1)
         self.live = Live(self._get_renderable(), console=self.console, transient=True, refresh_per_second=12)
         self.live.start()
