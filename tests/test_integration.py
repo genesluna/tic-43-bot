@@ -74,21 +74,29 @@ class TestConversationFlow:
 
             assert conversation.message_count() == initial_count - 1
 
-    def test_conversation_history_limit(self):
+    @patch("utils.conversation.config")
+    def test_conversation_history_limit(self, mock_config):
         """Testa que histórico respeita limite configurado.
 
         MAX_HISTORY_SIZE representa pares de mensagens (usuário + assistente).
         O limite real de mensagens individuais é MAX_HISTORY_SIZE * 2.
         """
+        mock_config.MAX_HISTORY_SIZE = 5
+        mock_config.SYSTEM_PROMPT = "Test"
+        mock_config.RESPONSE_LANGUAGE = ""
+        mock_config.RESPONSE_LENGTH = ""
+        mock_config.RESPONSE_TONE = ""
+        mock_config.RESPONSE_FORMAT = ""
+
         conversation = ConversationManager()
 
-        for i in range(100):
+        for i in range(20):
             conversation.add_user_message(f"Mensagem {i}")
             conversation.add_assistant_message(f"Resposta {i}")
 
-        from utils.config import config
-        max_messages = config.MAX_HISTORY_SIZE * 2
-        assert len(conversation.messages) <= max_messages + 1
+        max_messages = mock_config.MAX_HISTORY_SIZE * 2
+        # +1 for system prompt
+        assert len(conversation.messages) == max_messages + 1
 
 
 class TestMainIntegration:

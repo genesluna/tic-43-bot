@@ -106,7 +106,7 @@ class Config:
         """Limite de caracteres para entrada do usuário no prompt.
 
         Este limite é para UX no input. O limite técnico para mensagens
-        armazenadas/enviadas à API é 100.000 caracteres (MAX_MESSAGE_CONTENT_SIZE).
+        armazenadas/enviadas à API é definido por MAX_MESSAGE_CONTENT_SIZE.
         """
         return self._get_int_env("MAX_MESSAGE_LENGTH", 10000)
 
