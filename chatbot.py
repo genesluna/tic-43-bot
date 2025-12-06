@@ -124,22 +124,27 @@ def main():
 
                 try:
                     display.start_spinner()
-                    response_chunks = []
-                    char_count = 0
+                    first_chunk = True
 
                     for chunk in client.send_message_stream(conversation.get_messages()):
-                        response_chunks.append(chunk)
-                        char_count += len(chunk)
-                        display.update_spinner_tokens(char_count // CHARS_PER_TOKEN)
+                        if first_chunk:
+                            display.transition_spinner_to_streaming()
+                            first_chunk = False
+                        display.add_streaming_chunk(chunk)
 
-                    display.stop_spinner()
+                    if first_chunk:
+                        display.stop_spinner()
+                        response = ""
+                    else:
+                        response = display.stop_streaming()
 
-                    response = "".join(response_chunks)
-                    conversation.add_assistant_message(response)
-                    display.show_bot_message(response)
+                    if response:
+                        conversation.add_assistant_message(response)
 
                 except APIError as e:
                     display.stop_spinner()
+                    if display.streaming.running:
+                        display.streaming.stop()
                     display.show_error(str(e))
                     conversation.remove_last_user_message()
 

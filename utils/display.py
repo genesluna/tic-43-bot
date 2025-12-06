@@ -120,12 +120,74 @@ class RotatingSpinner:
             self.live.stop()
 
 
+class StreamingTextDisplay:
+    """Exibição de texto em streaming com buffer thread-safe."""
+
+    def __init__(self, console: Console):
+        self.console = console
+        self.live: Live | None = None
+        self.running = False
+        self._buffer = ""
+        self._lock = threading.Lock()
+
+    def _get_renderable(self):
+        """Retorna o texto atual como Markdown."""
+        with self._lock:
+            current_text = self._buffer
+
+        if not current_text:
+            return Text("")
+
+        return Markdown(current_text)
+
+    def add_chunk(self, chunk: str) -> None:
+        """Adiciona chunk ao buffer (thread-safe)."""
+        with self._lock:
+            self._buffer += chunk
+
+        if self.live and self.running:
+            self.live.update(self._get_renderable())
+
+    def get_full_text(self) -> str:
+        """Retorna texto completo acumulado."""
+        with self._lock:
+            return self._buffer
+
+    def start(self) -> None:
+        """Inicia exibição em streaming."""
+        if self.running:
+            return
+
+        self.running = True
+        with self._lock:
+            self._buffer = ""
+
+        self.console.print()
+        self.live = Live(
+            self._get_renderable(),
+            console=self.console,
+            refresh_per_second=10,
+            vertical_overflow="visible",
+        )
+        self.live.start()
+
+    def stop(self) -> None:
+        """Para exibição e finaliza."""
+        self.running = False
+        if self.live:
+            self.live.update(self._get_renderable())
+            self.live.stop()
+            self.live = None
+        self.console.print()
+
+
 class Display:
     """Gerencia a exibição formatada no terminal."""
 
     def __init__(self):
         self.console = Console()
         self.spinner = RotatingSpinner(self.console)
+        self.streaming = StreamingTextDisplay(self.console)
 
     def show_banner(self) -> None:
         """Exibe o banner de boas-vindas."""
@@ -197,6 +259,24 @@ class Display:
     def update_spinner_tokens(self, count: int) -> None:
         """Atualiza o contador de tokens no spinner."""
         self.spinner.update_tokens(count)
+
+    def start_streaming(self) -> None:
+        """Inicia modo de exibição em streaming."""
+        self.streaming.start()
+
+    def add_streaming_chunk(self, chunk: str) -> None:
+        """Adiciona chunk ao streaming."""
+        self.streaming.add_chunk(chunk)
+
+    def stop_streaming(self) -> str:
+        """Para streaming e retorna texto completo."""
+        self.streaming.stop()
+        return self.streaming.get_full_text()
+
+    def transition_spinner_to_streaming(self) -> None:
+        """Transiciona do spinner para modo streaming."""
+        self.stop_spinner()
+        self.start_streaming()
 
     def show_model_info(self, model: str) -> None:
         """Exibe informação sobre o modelo atual."""

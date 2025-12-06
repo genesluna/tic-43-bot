@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from io import StringIO
-from utils.display import Display, RotatingSpinner, THINKING_WORDS
+from utils.display import Display, RotatingSpinner, StreamingTextDisplay, THINKING_WORDS
 
 
 class TestThinkingWords:
@@ -345,3 +345,136 @@ class TestDisplay:
 
         assert "~100" in text_str
         assert "tokens" in text_str
+
+
+class TestStreamingTextDisplay:
+    """Testes para exibição de texto em streaming."""
+
+    def test_init(self):
+        """Verifica inicialização."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        assert streaming.running is False
+        assert streaming._buffer == ""
+
+    def test_add_chunk(self):
+        """Verifica se chunks são adicionados."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        streaming.add_chunk("Hello")
+        streaming.add_chunk(" World")
+
+        assert streaming.get_full_text() == "Hello World"
+
+    def test_thread_safety(self):
+        """Verifica se adição de chunks é thread-safe."""
+        from rich.console import Console
+        import threading
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        def add_chunks():
+            for i in range(100):
+                streaming.add_chunk(f"{i}")
+
+        threads = [threading.Thread(target=add_chunks) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        text = streaming.get_full_text()
+        assert len(text) > 0
+
+    def test_start_clears_buffer(self):
+        """Start deve limpar buffer anterior."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        streaming.add_chunk("Old text")
+        streaming.start()
+
+        assert streaming.get_full_text() == ""
+        streaming.stop()
+
+    def test_double_start_is_safe(self):
+        """Iniciar duas vezes não deve causar erro."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        streaming.start()
+        streaming.start()
+
+        assert streaming.running is True
+        streaming.stop()
+
+    def test_double_stop_is_safe(self):
+        """Parar duas vezes não deve causar erro."""
+        from rich.console import Console
+
+        console = Console()
+        streaming = StreamingTextDisplay(console)
+
+        streaming.start()
+        streaming.stop()
+        streaming.stop()
+
+        assert streaming.running is False
+
+
+class TestDisplayStreaming:
+    """Testes para métodos de streaming no Display."""
+
+    def test_display_has_streaming(self):
+        """Verifica se Display tem atributo streaming."""
+        display = Display()
+        assert hasattr(display, 'streaming')
+        assert isinstance(display.streaming, StreamingTextDisplay)
+
+    def test_transition_spinner_to_streaming(self):
+        """Verifica transição de spinner para streaming."""
+        display = Display()
+
+        display.start_spinner()
+        assert display.spinner.running is True
+
+        display.transition_spinner_to_streaming()
+
+        assert display.spinner.running is False
+        assert display.streaming.running is True
+
+        display.stop_streaming()
+
+    def test_streaming_workflow(self):
+        """Testa fluxo completo de streaming."""
+        display = Display()
+
+        display.start_streaming()
+        display.add_streaming_chunk("Hello")
+        display.add_streaming_chunk(" ")
+        display.add_streaming_chunk("World")
+
+        result = display.stop_streaming()
+
+        assert result == "Hello World"
+        assert display.streaming.running is False
+
+    def test_streaming_with_empty_response(self):
+        """Streaming sem chunks deve retornar string vazia."""
+        display = Display()
+
+        display.start_streaming()
+        result = display.stop_streaming()
+
+        assert result == ""

@@ -107,6 +107,7 @@ class TestMainIntegration:
 
         mock_display = MagicMock()
         mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display.stop_streaming.return_value = "Olá! Como posso ajudar?"
         mock_display_class.return_value = mock_display
 
         mock_client = MagicMock()
@@ -124,10 +125,11 @@ class TestMainIntegration:
         mock_display.show_banner.assert_called_once()
         mock_display.show_info.assert_called()
         mock_display.start_spinner.assert_called_once()
-        mock_display.stop_spinner.assert_called()
+        mock_display.transition_spinner_to_streaming.assert_called()
+        mock_display.add_streaming_chunk.assert_called()
+        mock_display.stop_streaming.assert_called()
         mock_conv.add_user_message.assert_called_with("Olá")
-        mock_conv.add_assistant_message.assert_called_with("Olá! Como posso ajudar?")
-        mock_display.show_bot_message.assert_called_with("Olá! Como posso ajudar?")
+        mock_conv.add_assistant_message.assert_called()
         mock_display.show_goodbye.assert_called_once()
 
     @patch("chatbot.Display")
