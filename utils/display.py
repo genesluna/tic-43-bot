@@ -1,10 +1,5 @@
 """Formatação e exibição no terminal."""
 
-try:
-    import readline
-except ImportError:
-    pass
-
 import random
 import time
 import threading
@@ -12,10 +7,9 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
 from rich.text import Text
-from .config import config
 
 
-THINKING_WORDS = [
+THINKING_WORDS: list[str] = [
     "Pensando",
     "Analisando",
     "Processando",
@@ -53,13 +47,13 @@ class RotatingSpinner:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
 
-    def _get_renderable(self):
+    def _get_renderable(self) -> Text:
         char = self.spinner_chars[self.char_index]
         word = THINKING_WORDS[self.word_index]
         elapsed = int(time.time() - self.start_time)
         with self._lock:
             current_tokens = self._token_count
-        parts = [
+        parts: list[tuple[str, str] | str] = [
             (char, "cyan"),
             " ",
             (f"{word}…", "dim"),
@@ -69,8 +63,8 @@ class RotatingSpinner:
         ]
         if current_tokens > 0:
             parts.extend([
-                (" · ↓ ", "dim"),
-                (f"{current_tokens}", "dim"),
+                (" · ", "dim"),
+                (f"~{current_tokens}", "dim"),
                 (" tokens", "dim"),
             ])
         parts.append((")", "dim"))
@@ -97,7 +91,10 @@ class RotatingSpinner:
             self.live.update(self._get_renderable())
             self.char_index = (self.char_index + 1) % len(self.spinner_chars)
 
-    def start(self):
+    def start(self) -> None:
+        """Inicia o spinner. Seguro para chamadas múltiplas."""
+        if self.running:
+            return
         self.running = True
         self._stop_event.clear()
         self.start_time = time.time()
@@ -109,7 +106,8 @@ class RotatingSpinner:
         self.thread = threading.Thread(target=self._animate, daemon=True)
         self.thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
+        """Para o spinner. Seguro para chamadas múltiplas."""
         self.running = False
         self._stop_event.set()
         if self.thread:
@@ -183,7 +181,7 @@ class Display:
     def show_goodbye(self) -> None:
         """Exibe mensagem de despedida."""
         self.console.print()
-        self.console.print("[dim]Até logo![/dim] 👋")
+        self.console.print("[dim]Até logo![/dim]")
         self.console.print()
 
     def start_spinner(self) -> None:

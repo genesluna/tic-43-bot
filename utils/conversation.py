@@ -133,4 +133,4 @@ class ConversationManager:
 
     def message_count(self) -> int:
         """Retorna o número de mensagens (excluindo system)."""
-        return len(self.get_history_for_display())
+        return sum(1 for msg in self.messages if msg["role"] != "system")

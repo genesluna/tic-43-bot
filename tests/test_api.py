@@ -74,6 +74,41 @@ class TestOpenRouterClient:
 
         assert client.get_model() == new_model
 
+    def test_set_model_empty_string(self):
+        """Verifica se string vazia levanta ValueError."""
+        client = OpenRouterClient()
+
+        with pytest.raises(ValueError) as exc_info:
+            client.set_model("")
+
+        assert "string não vazia" in str(exc_info.value)
+
+    def test_set_model_whitespace_only(self):
+        """Verifica se string com apenas espaços levanta ValueError."""
+        client = OpenRouterClient()
+
+        with pytest.raises(ValueError) as exc_info:
+            client.set_model("   ")
+
+        assert "string não vazia" in str(exc_info.value)
+
+    def test_set_model_no_slash(self):
+        """Verifica se modelo sem barra levanta ValueError."""
+        client = OpenRouterClient()
+
+        with pytest.raises(ValueError) as exc_info:
+            client.set_model("gpt-4o-mini")
+
+        assert "provider/model-name" in str(exc_info.value)
+
+    def test_set_model_strips_whitespace(self):
+        """Verifica se espaços são removidos do modelo."""
+        client = OpenRouterClient()
+
+        client.set_model("  openai/gpt-4o  ")
+
+        assert client.get_model() == "openai/gpt-4o"
+
     def test_send_message_without_api_key(self):
         """Verifica se erro é levantado quando não há API key."""
         with patch("utils.api.config") as mock_config:
@@ -87,7 +122,7 @@ class TestOpenRouterClient:
             with pytest.raises(APIError) as exc_info:
                 client.send_message([{"role": "user", "content": "Olá"}])
 
-            assert "Chave da API não configurada" in str(exc_info.value)
+            assert "Chave de API não configurada" in str(exc_info.value)
 
     @patch("utils.api.httpx.Client")
     def test_send_message_success(self, mock_client_class):
@@ -219,7 +254,7 @@ class TestOpenRouterClient:
             with pytest.raises(APIError) as exc_info:
                 list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
 
-            assert "Chave da API não configurada" in str(exc_info.value)
+            assert "Chave de API não configurada" in str(exc_info.value)
 
     def test_send_message_stream_empty_messages(self):
         """Verifica se erro é levantado quando lista de mensagens está vazia."""

@@ -11,6 +11,11 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_CONNECT_TIMEOUT = 10.0
+DEFAULT_READ_TIMEOUT = 90.0
+DEFAULT_WRITE_TIMEOUT = 10.0
+DEFAULT_POOL_TIMEOUT = 10.0
+
 
 @lru_cache(maxsize=8)
 def _get_encoding(model: str) -> tiktoken.Encoding:
@@ -21,17 +26,22 @@ def _get_encoding(model: str) -> tiktoken.Encoding:
         return tiktoken.get_encoding("cl100k_base")
 
 
-def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
+def count_tokens(text: str, model: str | None = None) -> int:
     """
-    Conta o número de tokens em um texto.
+    Conta o número aproximado de tokens em um texto.
+
+    Nota: A contagem é aproximada pois usa o encoding cl100k_base como fallback
+    para modelos não-OpenAI.
 
     Args:
         text: Texto para contar tokens.
-        model: Modelo para usar o encoding apropriado.
+        model: Modelo para usar o encoding apropriado. Se None, usa cl100k_base.
 
     Returns:
-        Número de tokens.
+        Número aproximado de tokens.
     """
+    if model is None:
+        model = config.OPENROUTER_MODEL
     encoding = _get_encoding(model)
     return len(encoding.encode(text))
 
@@ -64,10 +74,10 @@ class OpenRouterClient:
         with self._client_lock:
             if self._client is None:
                 timeout = httpx.Timeout(
-                    connect=10.0,
-                    read=90.0,
-                    write=10.0,
-                    pool=10.0,
+                    connect=DEFAULT_CONNECT_TIMEOUT,
+                    read=DEFAULT_READ_TIMEOUT,
+                    write=DEFAULT_WRITE_TIMEOUT,
+                    pool=DEFAULT_POOL_TIMEOUT,
                 )
                 self._client = httpx.Client(timeout=timeout)
             return self._client
@@ -102,7 +112,7 @@ class OpenRouterClient:
         """
         if not self._api_key:
             raise APIError(
-                "Chave da API não configurada. Configure OPENROUTER_API_KEY no arquivo .env"
+                "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
             )
 
         if not messages:
@@ -162,7 +172,7 @@ class OpenRouterClient:
         """
         if not self._api_key:
             raise APIError(
-                "Chave da API não configurada. Configure OPENROUTER_API_KEY no arquivo .env"
+                "Chave de API não configurada. Configure OPENROUTER_API_KEY no arquivo .env."
             )
 
         if not messages:
@@ -210,7 +220,7 @@ class OpenRouterClient:
                             if content:
                                 yield content
                     except json.JSONDecodeError as e:
-                        logger.warning(f"Falha ao parsear SSE: {e}")
+                        logger.warning(f"Falha ao parsear SSE: {e} - dados: {data_str[:100]}")
                         continue
 
         except httpx.TimeoutException:
@@ -219,7 +229,22 @@ class OpenRouterClient:
             raise APIError("Não foi possível conectar à API. Verifique sua conexão.")
 
     def set_model(self, model: str) -> None:
-        """Altera o modelo utilizado."""
+        """
+        Altera o modelo utilizado.
+
+        Args:
+            model: Nome do modelo no formato 'provider/model-name'.
+
+        Raises:
+            ValueError: Se o modelo for inválido.
+        """
+        if not model or not isinstance(model, str):
+            raise ValueError("Modelo deve ser uma string não vazia.")
+        model = model.strip()
+        if not model:
+            raise ValueError("Modelo deve ser uma string não vazia.")
+        if "/" not in model:
+            raise ValueError("Modelo deve estar no formato 'provider/model-name'.")
         self.model = model
 
     def get_model(self) -> str:

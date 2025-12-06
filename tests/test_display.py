@@ -135,6 +135,7 @@ class TestDisplay:
 
         captured = capsys.readouterr()
         assert "Até logo" in captured.out
+        assert "👋" not in captured.out
 
     def test_show_bot_message(self, capsys):
         """Verifica se mensagem do bot é exibida."""
@@ -212,7 +213,7 @@ class TestDisplay:
 
         renderable = spinner._get_renderable()
         text_str = str(renderable)
-        assert "42" in text_str
+        assert "~42" in text_str
         assert "tokens" in text_str
 
     def test_spinner_double_stop_is_safe(self):
@@ -290,3 +291,33 @@ class TestDisplay:
 
         assert len(results) == 500
         assert all(isinstance(r, int) for r in results)
+
+    def test_spinner_double_start_is_safe(self):
+        """Iniciar spinner duas vezes não deve criar múltiplas threads."""
+        display = Display()
+
+        display.start_spinner()
+        first_thread = display.spinner.thread
+
+        display.start_spinner()
+        second_thread = display.spinner.thread
+
+        assert first_thread is second_thread
+        assert display.spinner.running is True
+
+        display.stop_spinner()
+
+    def test_spinner_shows_approximate_tokens(self):
+        """Spinner deve mostrar ~ para indicar tokens aproximados."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+        spinner.start_time = 0
+        spinner.update_tokens(100)
+
+        renderable = spinner._get_renderable()
+        text_str = str(renderable)
+
+        assert "~100" in text_str
+        assert "tokens" in text_str

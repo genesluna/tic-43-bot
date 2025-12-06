@@ -1,8 +1,8 @@
 """Testes para o módulo principal do chatbot."""
 
 import pytest
-from unittest.mock import MagicMock, patch
-from chatbot import handle_command
+from unittest.mock import MagicMock, patch, call
+from chatbot import handle_command, main
 
 
 class TestHandleCommand:
@@ -157,3 +157,138 @@ class TestHandleCommand:
         )
         assert result is True
         self.mock_display.show_help.assert_called_once()
+
+
+class TestMain:
+    """Testes para a função main."""
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    def test_main_config_validation_error(self, mock_config_class, mock_display_class):
+        """Verifica se erro de configuração encerra o programa."""
+        from chatbot import ConfigurationError
+
+        mock_display = MagicMock()
+        mock_display_class.return_value = mock_display
+        mock_config_class.validate.side_effect = ConfigurationError("API key missing")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        assert exc_info.value.code == 1
+        mock_display.show_error.assert_called_once()
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_keyboard_interrupt(
+        self, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica se Ctrl+C encerra graciosamente."""
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = KeyboardInterrupt()
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client_class.return_value = mock_client
+
+        main()
+
+        mock_display.show_goodbye.assert_called_once()
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_empty_input_ignored(
+        self, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica se input vazio é ignorado."""
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["", "   ", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv_class.return_value = mock_conv
+
+        main()
+
+        mock_conv.add_user_message.assert_not_called()
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    @patch("chatbot.config")
+    def test_main_message_too_long(
+        self, mock_config, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica se mensagem muito longa é rejeitada."""
+        mock_config.MAX_MESSAGE_LENGTH = 10
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Esta mensagem é muito longa", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv_class.return_value = mock_conv
+
+        main()
+
+        mock_display.show_error.assert_called()
+        mock_conv.add_user_message.assert_not_called()
+
+    @patch("chatbot.Display")
+    @patch("chatbot.Config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    @patch("chatbot.config")
+    def test_main_api_error_removes_user_message(
+        self, mock_config, mock_conv_class, mock_client_class, mock_config_class, mock_display_class
+    ):
+        """Verifica se erro de API remove a mensagem do usuário."""
+        from chatbot import APIError
+
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.side_effect = APIError("Connection failed")
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main()
+
+        mock_conv.remove_last_user_message.assert_called_once()
+        mock_display.show_error.assert_called()

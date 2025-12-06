@@ -7,7 +7,7 @@ manter conversas contextualizadas com o usuário.
 """
 
 import sys
-from utils.api import OpenRouterClient, APIError, count_tokens
+from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager
 from utils.display import Display
 from utils.config import config, Config, ConfigurationError
@@ -96,12 +96,12 @@ def main():
                 try:
                     display.start_spinner()
                     response_chunks = []
-                    token_count = 0
+                    char_count = 0
 
                     for chunk in client.send_message_stream(conversation.get_messages()):
                         response_chunks.append(chunk)
-                        token_count += count_tokens(chunk)
-                        display.update_spinner_tokens(token_count)
+                        char_count += len(chunk)
+                        display.update_spinner_tokens(char_count // 4)
 
                     display.stop_spinner()
 
