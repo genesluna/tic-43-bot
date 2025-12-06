@@ -163,8 +163,6 @@ class TestOpenRouterClient:
         mock_response.json.return_value = {"invalid": "response"}
 
         mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
         mock_client.post.return_value = mock_response
         mock_client_class.return_value = mock_client
 
@@ -174,4 +172,4 @@ class TestOpenRouterClient:
         with pytest.raises(APIError) as exc_info:
             client.send_message([{"role": "user", "content": "Olá"}])
 
-        assert "Resposta inesperada" in str(exc_info.value)
+        assert "não contém dados válidos" in str(exc_info.value)

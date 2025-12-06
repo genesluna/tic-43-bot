@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+class ConfigurationError(Exception):
+    """Erro de configuração do chatbot."""
+
+    pass
+
+
 class Config:
     """Classe de configuração do chatbot."""
 
@@ -23,6 +29,19 @@ class Config:
     SAVE_COMMANDS: tuple = ("/salvar", "/save")
     HELP_COMMANDS: tuple = ("/ajuda", "/help")
     MODEL_COMMANDS: tuple = ("/modelo",)
+
+    # Limites
+    MAX_MESSAGE_LENGTH: int = 10000
+    MAX_HISTORY_SIZE: int = 50
+
+    @classmethod
+    def validate(cls) -> None:
+        """Valida as configurações obrigatórias."""
+        if not cls.OPENROUTER_API_KEY:
+            raise ConfigurationError(
+                "OPENROUTER_API_KEY não configurada.\n"
+                "Configure no arquivo .env ou como variável de ambiente."
+            )
 
 
 config = Config()

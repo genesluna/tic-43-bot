@@ -82,19 +82,20 @@ class TestConversationManager:
         manager.add_assistant_message("Oi!")
         assert manager.message_count() == 2
 
-    def test_save_to_file(self, tmp_path):
+    def test_save_to_file(self, tmp_path, monkeypatch):
         """Verifica se o histórico é salvo corretamente em arquivo."""
+        monkeypatch.chdir(tmp_path)
+
         manager = ConversationManager()
         manager.add_user_message("Olá")
         manager.add_assistant_message("Oi!")
 
-        filename = str(tmp_path / "test_history.json")
-        saved_path = manager.save_to_file(filename)
+        saved_path = manager.save_to_file("test_history.json")
 
-        assert saved_path == filename
-        assert os.path.exists(filename)
+        assert "test_history.json" in saved_path
+        assert os.path.exists(saved_path)
 
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(saved_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert "timestamp" in data
@@ -111,9 +112,57 @@ class TestConversationManager:
 
         saved_path = manager.save_to_file()
 
-        assert saved_path.startswith("historico_")
+        assert "history_" in saved_path
         assert saved_path.endswith(".json")
         assert os.path.exists(saved_path)
+
+    def test_remove_last_user_message(self):
+        """Verifica se a última mensagem do usuário é removida corretamente."""
+        manager = ConversationManager()
+        manager.add_user_message("Primeira")
+        manager.add_assistant_message("Resposta")
+        manager.add_user_message("Segunda")
+
+        removed = manager.remove_last_user_message()
+
+        assert removed == "Segunda"
+        assert manager.message_count() == 2
+
+    def test_remove_last_user_message_empty(self):
+        """Verifica comportamento quando não há mensagens do usuário."""
+        manager = ConversationManager()
+
+        removed = manager.remove_last_user_message()
+
+        assert removed is None
+
+    def test_history_limit(self):
+        """Verifica se o limite de histórico é respeitado."""
+        from utils.config import config
+
+        manager = ConversationManager()
+
+        # Adiciona mensagens além do limite
+        for i in range(config.MAX_HISTORY_SIZE + 10):
+            manager.add_user_message(f"Mensagem {i}")
+            manager.add_assistant_message(f"Resposta {i}")
+
+        # Deve ter no máximo MAX_HISTORY_SIZE mensagens + system prompt
+        assert len(manager.messages) <= config.MAX_HISTORY_SIZE + 1
+
+    def test_sanitize_filename(self):
+        """Verifica se nomes de arquivo são sanitizados."""
+        manager = ConversationManager()
+
+        # Path traversal deve ser sanitizado
+        sanitized = manager._sanitize_filename("../../../etc/passwd")
+        assert ".." not in sanitized
+        assert "/" not in sanitized
+
+        # Caracteres especiais devem ser removidos
+        sanitized = manager._sanitize_filename('file<>:"/\\|?*.json')
+        assert "<" not in sanitized
+        assert ">" not in sanitized
 
     def test_conversation_flow(self):
         """Testa um fluxo de conversa completo."""

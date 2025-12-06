@@ -6,10 +6,11 @@ Um chatbot interativo que utiliza a API OpenRouter para
 manter conversas contextualizadas com o usuário.
 """
 
+import sys
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager
 from utils.display import Display
-from utils.config import config
+from utils.config import config, Config, ConfigurationError
 
 
 def handle_command(
@@ -38,8 +39,8 @@ def handle_command(
         try:
             filename = conversation.save_to_file()
             display.show_success(f"Histórico salvo em: {filename}")
-        except Exception as e:
-            display.show_error(f"Erro ao salvar: {e}")
+        except IOError as e:
+            display.show_error(str(e))
         return True
 
     if user_input_lower in config.HELP_COMMANDS:
@@ -56,6 +57,14 @@ def handle_command(
 def main():
     """Loop principal do chatbot."""
     display = Display()
+
+    # Valida configuração antes de iniciar
+    try:
+        Config.validate()
+    except ConfigurationError as e:
+        display.show_error(str(e))
+        sys.exit(1)
+
     client = OpenRouterClient()
     conversation = ConversationManager()
 
@@ -63,38 +72,49 @@ def main():
     display.show_info("Digite /ajuda para ver os comandos disponíveis.")
     display.console.print()
 
-    while True:
-        try:
-            user_input = display.prompt_input()
-
-            if not user_input.strip():
-                continue
-
-            command_result = handle_command(user_input, conversation, client, display)
-
-            if command_result is False:
-                break
-            elif command_result is True:
-                continue
-
-            conversation.add_user_message(user_input)
-
+    try:
+        while True:
             try:
-                display.start_spinner()
-                response = client.send_message(conversation.get_messages())
-                display.stop_spinner()
+                user_input = display.prompt_input()
 
-                conversation.add_assistant_message(response)
-                display.show_bot_message(response)
+                if not user_input.strip():
+                    continue
 
-            except APIError as e:
-                display.stop_spinner()
-                display.show_error(str(e))
-                conversation.messages.pop()
+                # Valida tamanho da mensagem
+                if len(user_input) > config.MAX_MESSAGE_LENGTH:
+                    display.show_error(
+                        f"Mensagem muito longa (máximo {config.MAX_MESSAGE_LENGTH} caracteres)."
+                    )
+                    continue
 
-        except KeyboardInterrupt:
-            display.console.print()
-            break
+                command_result = handle_command(user_input, conversation, client, display)
+
+                if command_result is False:
+                    break
+                elif command_result is True:
+                    continue
+
+                conversation.add_user_message(user_input)
+
+                try:
+                    display.start_spinner()
+                    response = client.send_message(conversation.get_messages())
+                    display.stop_spinner()
+
+                    conversation.add_assistant_message(response)
+                    display.show_bot_message(response)
+
+                except APIError as e:
+                    display.stop_spinner()
+                    display.show_error(str(e))
+                    conversation.remove_last_user_message()
+
+            except KeyboardInterrupt:
+                display.console.print()
+                break
+
+    finally:
+        client.close()
 
     display.show_goodbye()
 

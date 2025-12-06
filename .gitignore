@@ -31,5 +31,5 @@ Thumbs.db
 htmlcov/
 
 # Histórico de conversas salvas
-historico_*.json
-historico_*.txt
+history/
+history_*.json
