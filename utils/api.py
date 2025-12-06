@@ -1,11 +1,15 @@
 """Cliente para a API OpenRouter."""
 
 import json
+import logging
+import threading
 import httpx
 import tiktoken
 from functools import lru_cache
 from typing import Generator
 from .config import config
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=8)
@@ -17,7 +21,7 @@ def _get_encoding(model: str) -> tiktoken.Encoding:
         return tiktoken.get_encoding("cl100k_base")
 
 
-def count_tokens(text: str, model: str = "gpt-4") -> int:
+def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
     """
     Conta o número de tokens em um texto.
 
@@ -35,33 +39,42 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
 class APIError(Exception):
     """Erro de comunicação com a API."""
 
-    pass
-
 
 class OpenRouterClient:
     """Cliente para comunicação com a API OpenRouter."""
 
     def __init__(self):
         self.base_url = config.OPENROUTER_BASE_URL
-        self.api_key = config.OPENROUTER_API_KEY
+        self._api_key = config.OPENROUTER_API_KEY
         self.model = config.OPENROUTER_MODEL
         self._client: httpx.Client | None = None
+        self._client_lock = threading.Lock()
+
+    def __repr__(self) -> str:
+        return f"OpenRouterClient(model={self.model})"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def _get_client(self) -> httpx.Client:
-        """Retorna cliente HTTP reutilizável."""
-        if self._client is None:
-            timeout = httpx.Timeout(
-                connect=10.0,
-                read=90.0,
-                write=10.0,
-                pool=10.0,
-            )
-            self._client = httpx.Client(timeout=timeout)
-        return self._client
+        """Retorna cliente HTTP reutilizável (thread-safe)."""
+        with self._client_lock:
+            if self._client is None:
+                timeout = httpx.Timeout(
+                    connect=10.0,
+                    read=90.0,
+                    write=10.0,
+                    pool=10.0,
+                )
+                self._client = httpx.Client(timeout=timeout)
+            return self._client
 
     def _get_headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
 
@@ -87,7 +100,7 @@ class OpenRouterClient:
         Raises:
             APIError: Em caso de erro na comunicação.
         """
-        if not self.api_key:
+        if not self._api_key:
             raise APIError(
                 "Chave da API não configurada. Configure OPENROUTER_API_KEY no arquivo .env"
             )
@@ -147,7 +160,7 @@ class OpenRouterClient:
         Raises:
             APIError: Em caso de erro na comunicação.
         """
-        if not self.api_key:
+        if not self._api_key:
             raise APIError(
                 "Chave da API não configurada. Configure OPENROUTER_API_KEY no arquivo .env"
             )
@@ -196,7 +209,8 @@ class OpenRouterClient:
                             content = delta.get("content")
                             if content:
                                 yield content
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Falha ao parsear SSE: {e}")
                         continue
 
         except httpx.TimeoutException:

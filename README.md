@@ -44,6 +44,9 @@ venv\Scripts\activate     # Windows
 
 ```bash
 pip install -r requirements.txt
+
+# Para desenvolvimento (inclui pytest):
+pip install -r requirements-dev.txt
 ```
 
 4. Configure as variáveis de ambiente:
@@ -109,6 +112,8 @@ As seguintes variáveis podem ser configuradas no arquivo `.env`:
 | `RESPONSE_LENGTH`    | Tamanho das respostas        | `conciso`                                  |
 | `RESPONSE_TONE`      | Tom/estilo das respostas     | `amigável`                                 |
 | `RESPONSE_FORMAT`    | Formato do texto             | `markdown`                                 |
+| `MAX_MESSAGE_LENGTH` | Limite de caracteres/mensagem| `10000`                                    |
+| `MAX_HISTORY_SIZE`   | Máximo de mensagens no histórico | `50`                                   |
 
 ### Exemplos de Personalização
 
@@ -154,6 +159,7 @@ pytest tests/ -v --cov=utils --cov-report=term-missing
 
 ### Estrutura de testes
 
+- `tests/test_chatbot.py` - Testes do módulo principal
 - `tests/test_config.py` - Testes de configuração
 - `tests/test_conversation.py` - Testes do gerenciador de conversas
 - `tests/test_api.py` - Testes do cliente OpenRouter
@@ -164,13 +170,15 @@ pytest tests/ -v --cov=utils --cov-report=term-missing
 ```
 chatbot-tic43/
 ├── README.md              # Esta documentação
-├── requirements.txt       # Dependências Python
+├── requirements.txt       # Dependências de produção
+├── requirements-dev.txt   # Dependências de desenvolvimento
 ├── .env.example           # Template de configuração
 ├── .gitignore             # Arquivos ignorados pelo git
 ├── chatbot.py             # Ponto de entrada principal
 ├── TIC_43_BOT_PRD.md      # Documento de requisitos do produto
 ├── tests/                 # Testes unitários
 │   ├── __init__.py
+│   ├── test_chatbot.py
 │   ├── test_api.py
 │   ├── test_config.py
 │   ├── test_conversation.py

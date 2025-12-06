@@ -51,6 +51,7 @@ class RotatingSpinner:
         self.start_time = 0
         self._token_count = 0
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
 
     def _get_renderable(self):
         char = self.spinner_chars[self.char_index]
@@ -88,17 +89,17 @@ class RotatingSpinner:
 
     def _animate(self):
         self.last_word_change = time.time()
-        while self.running:
+        while not self._stop_event.wait(timeout=0.08):
             if time.time() - self.last_word_change >= self.word_change_interval:
                 self.word_index = (self.word_index + 1) % len(THINKING_WORDS)
                 self.last_word_change = time.time()
 
             self.live.update(self._get_renderable())
             self.char_index = (self.char_index + 1) % len(self.spinner_chars)
-            time.sleep(0.08)
 
     def start(self):
         self.running = True
+        self._stop_event.clear()
         self.start_time = time.time()
         with self._lock:
             self._token_count = 0
@@ -110,6 +111,7 @@ class RotatingSpinner:
 
     def stop(self):
         self.running = False
+        self._stop_event.set()
         if self.thread:
             self.thread.join(timeout=0.2)
         if self.live:
@@ -154,10 +156,6 @@ class Display:
         for cmd, desc in commands:
             self.console.print(f"  [bold cyan]{cmd:<20}[/bold cyan] [dim]{desc}[/dim]")
         self.console.print()
-
-    def show_user_message(self, message: str) -> None:
-        """Exibe uma mensagem do usuário."""
-        pass
 
     def show_bot_message(self, message: str) -> None:
         """Exibe uma resposta do bot com suporte a Markdown."""
@@ -207,6 +205,7 @@ class Display:
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""
         try:
-            return input("\033[1;36m>\033[0m ")
+            self.console.print("[bold cyan]>[/bold cyan] ", end="")
+            return input()
         except EOFError:
             return "sair"

@@ -74,8 +74,8 @@ class ConversationManager:
         return None
 
     def get_messages(self) -> list[dict]:
-        """Retorna todas as mensagens."""
-        return self.messages
+        """Retorna uma cópia de todas as mensagens."""
+        return self.messages.copy()
 
     def clear(self) -> None:
         """Limpa o histórico, mantendo apenas o system prompt."""
@@ -88,7 +88,10 @@ class ConversationManager:
     def _sanitize_filename(self, filename: str) -> str:
         """Remove caracteres perigosos do nome do arquivo."""
         basename = os.path.basename(filename)
-        sanitized = re.sub(r'[<>:"/\\|?*]', '_', basename)
+        sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', basename)
+        sanitized = sanitized.strip('. ')
+        if not sanitized:
+            sanitized = "history"
         if not sanitized.endswith('.json'):
             sanitized += '.json'
         return sanitized
