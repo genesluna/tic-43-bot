@@ -11,12 +11,15 @@ class ConfigurationError(Exception):
 
 
 def _get_int_env(name: str, default: int) -> int:
-    """Obtém variável de ambiente como inteiro com validação."""
-    value = os.getenv(name, str(default))
+    """Obtém variável de ambiente como inteiro positivo com validação."""
+    raw_value = os.getenv(name, str(default))
     try:
-        return int(value)
+        value = int(raw_value)
     except ValueError:
-        raise ConfigurationError(f"{name} deve ser um número inteiro, recebido: '{value}'")
+        raise ConfigurationError(f"{name} deve ser um número inteiro, recebido: '{raw_value}'")
+    if value <= 0:
+        raise ConfigurationError(f"{name} deve ser um inteiro positivo, recebido: '{value}'")
+    return value
 
 
 class Config:

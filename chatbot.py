@@ -64,14 +64,13 @@ def main():
         display.show_error(str(e))
         sys.exit(1)
 
-    client = OpenRouterClient()
-    conversation = ConversationManager()
+    with OpenRouterClient() as client:
+        conversation = ConversationManager()
 
-    display.show_banner()
-    display.show_info("Digite /ajuda para ver os comandos disponíveis.")
-    display.console.print()
+        display.show_banner()
+        display.show_info("Digite /ajuda para ver os comandos disponíveis.")
+        display.console.print()
 
-    try:
         while True:
             try:
                 user_input = display.prompt_input()
@@ -118,9 +117,6 @@ def main():
             except KeyboardInterrupt:
                 display.console.print()
                 break
-
-    finally:
-        client.close()
 
     display.show_goodbye()
 
