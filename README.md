@@ -108,6 +108,29 @@ Alguns modelos populares disponíveis via OpenRouter:
 
 - `openai/gpt-4o-mini` - Rápido e econômico
 
+## Testes
+
+O projeto inclui testes unitários.
+
+### Executar testes
+
+```bash
+pytest tests/ -v
+```
+
+### Executar testes com cobertura
+
+```bash
+pytest tests/ -v --cov=utils --cov-report=term-missing
+```
+
+### Estrutura de testes
+
+- `tests/test_config.py` - Testes de configuração
+- `tests/test_conversation.py` - Testes do gerenciador de conversas
+- `tests/test_api.py` - Testes do cliente OpenRouter
+- `tests/test_display.py` - Testes da interface de exibição
+
 ## Estrutura do Projeto
 
 ```
@@ -118,6 +141,12 @@ chatbot-tic43/
 ├── .gitignore             # Arquivos ignorados pelo git
 ├── chatbot.py             # Ponto de entrada principal
 ├── TIC_43_BOT_PRD.md      # Documento de requisitos do produto
+├── tests/                 # Testes unitários
+│   ├── __init__.py
+│   ├── test_api.py
+│   ├── test_config.py
+│   ├── test_conversation.py
+│   └── test_display.py
 └── utils/
     ├── __init__.py        # Inicialização do módulo
     ├── api.py             # Cliente OpenRouter

@@ -25,6 +25,11 @@ build/
 .DS_Store
 Thumbs.db
 
+# Testes e cobertura
+.coverage
+.pytest_cache/
+htmlcov/
+
 # Histórico de conversas salvas
 historico_*.json
 historico_*.txt
