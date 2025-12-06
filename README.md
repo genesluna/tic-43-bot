@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-277%20passed-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-283%20passed-brightgreen.svg)](#testes)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
@@ -82,8 +82,7 @@ python chatbot.py --log-file app.log  # Salva logs em arquivo
 | `/listar`, `/list`                       | Lista históricos salvos           |
 | `/carregar <arquivo>`, `/load <arquivo>` | Carrega histórico de arquivo      |
 | `/ajuda`, `/help`                        | Mostra comandos disponíveis       |
-| `/modelo`                                | Mostra o modelo atual             |
-| `/modelo <nome>`                         | Altera o modelo de IA             |
+| `/modelo [nome]`                         | Mostra ou altera o modelo atual   |
 
 ### Exemplo de Conversa
 
@@ -180,7 +179,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui 277 testes com 93% de cobertura.
+O projeto possui 283 testes com 93% de cobertura.
 
 ```bash
 # Executar testes
