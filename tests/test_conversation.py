@@ -4,7 +4,8 @@ import os
 import json
 import pytest
 from unittest.mock import patch
-from utils.conversation import ConversationManager, ConversationLoadError, MAX_MESSAGE_CONTENT_SIZE
+from utils.conversation import ConversationManager, ConversationLoadError
+from utils.config import MAX_MESSAGE_CONTENT_SIZE
 
 
 class TestConversationManager:
@@ -186,6 +187,43 @@ class TestConversationManager:
         sanitized = manager._sanitize_filename("file\x00\x1fname.json")
         assert "\x00" not in sanitized
         assert "\x1f" not in sanitized
+
+    def test_sanitize_filename_with_spaces(self):
+        """Espaços devem ser convertidos em underscores."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("my file name.json")
+        assert " " not in sanitized
+        assert sanitized == "my_file_name.json"
+
+    def test_sanitize_filename_multiple_spaces(self):
+        """Múltiplos espaços devem ser convertidos em um único underscore."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("my   file   name.json")
+        assert "   " not in sanitized
+        assert sanitized == "my_file_name.json"
+
+    def test_sanitize_filename_with_other_extension(self):
+        """Extensões não-json devem ser removidas."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("backup.bak")
+        assert sanitized == "backup.json"
+
+    def test_sanitize_filename_with_json_bak_extension(self):
+        """Arquivos como .json.bak devem virar .json, não .json.bak.json."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("history.json.bak")
+        assert sanitized == "history.json"
+
+    def test_sanitize_filename_case_insensitive_json(self):
+        """Extensão .JSON (maiúscula) deve ser tratada corretamente."""
+        manager = ConversationManager()
+
+        sanitized = manager._sanitize_filename("history.JSON")
+        assert sanitized == "history.json"
 
     def test_save_to_file_io_error(self, tmp_path, monkeypatch):
         """Erro de I/O deve levantar IOError."""
@@ -703,8 +741,6 @@ class TestUnicodeAndLargeMessages:
     @patch("utils.conversation.config")
     def test_load_file_with_large_message_at_limit(self, mock_config, tmp_path):
         """Verifica carregamento de arquivo com mensagem no limite."""
-        from utils.conversation import MAX_MESSAGE_CONTENT_SIZE
-
         mock_config.SYSTEM_PROMPT = "Test"
         mock_config.RESPONSE_LANGUAGE = ""
         mock_config.RESPONSE_LENGTH = ""
@@ -733,8 +769,6 @@ class TestUnicodeAndLargeMessages:
     @patch("utils.conversation.config")
     def test_load_file_with_message_exceeding_limit(self, mock_config, tmp_path):
         """Verifica erro ao carregar mensagem que excede limite."""
-        from utils.conversation import MAX_MESSAGE_CONTENT_SIZE, ConversationLoadError
-
         mock_config.SYSTEM_PROMPT = "Test"
         mock_config.RESPONSE_LANGUAGE = ""
         mock_config.RESPONSE_LENGTH = ""

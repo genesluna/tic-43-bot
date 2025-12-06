@@ -7,6 +7,7 @@ import time
 from unittest.mock import patch, MagicMock
 import httpx
 from utils.api import OpenRouterClient, APIError, RateLimitError, StreamingResponse
+from utils.config import MAX_MESSAGE_CONTENT_SIZE
 
 
 class TestOpenRouterClient:
@@ -52,7 +53,7 @@ class TestOpenRouterClient:
         with pytest.raises(ValueError) as exc_info:
             client.set_model(None)
 
-        assert "string não vazia" in str(exc_info.value)
+        assert "provider/model-name" in str(exc_info.value)
 
     def test_set_model_empty_string(self):
         """Verifica se string vazia levanta ValueError."""
@@ -61,7 +62,7 @@ class TestOpenRouterClient:
         with pytest.raises(ValueError) as exc_info:
             client.set_model("")
 
-        assert "string não vazia" in str(exc_info.value)
+        assert "provider/model-name" in str(exc_info.value)
 
     def test_set_model_whitespace_only(self):
         """Verifica se string com apenas espaços levanta ValueError."""
@@ -70,7 +71,7 @@ class TestOpenRouterClient:
         with pytest.raises(ValueError) as exc_info:
             client.set_model("   ")
 
-        assert "string não vazia" in str(exc_info.value)
+        assert "não pode estar vazio" in str(exc_info.value)
 
     def test_set_model_no_slash(self):
         """Verifica se modelo sem barra levanta ValueError."""
@@ -80,6 +81,7 @@ class TestOpenRouterClient:
             client.set_model("gpt-4o-mini")
 
         assert "provider/model-name" in str(exc_info.value)
+        assert "gpt-4o-mini" in str(exc_info.value)
 
     def test_set_model_strips_whitespace(self):
         """Verifica se espaços são removidos do modelo."""
@@ -680,8 +682,6 @@ class TestMessageValidation:
 
     def test_validate_messages_content_too_large(self):
         """Verifica erro quando conteúdo excede tamanho máximo."""
-        from utils.api import MAX_MESSAGE_CONTENT_SIZE
-
         client = OpenRouterClient()
         client._api_key = "test_key"
 
@@ -694,8 +694,6 @@ class TestMessageValidation:
 
     def test_validate_messages_content_at_limit(self):
         """Verifica que conteúdo exatamente no limite é aceito."""
-        from utils.api import MAX_MESSAGE_CONTENT_SIZE
-
         client = OpenRouterClient()
         client._api_key = "test_key"
 

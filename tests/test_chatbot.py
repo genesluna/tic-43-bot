@@ -395,6 +395,43 @@ class TestMain:
         mock_conv.remove_last_user_message.assert_called_once()
         mock_display.show_error.assert_called()
 
+    @patch("chatbot.Display")
+    @patch("chatbot.config")
+    @patch("chatbot.OpenRouterClient")
+    @patch("chatbot.ConversationManager")
+    def test_main_empty_response_removes_user_message(
+        self, mock_conv_class, mock_client_class, mock_config, mock_display_class
+    ):
+        """Verifica se resposta vazia remove a mensagem do usuário."""
+        mock_config.MAX_MESSAGE_LENGTH = 10000
+        mock_config.EXIT_COMMANDS = ("sair",)
+        mock_config.CLEAR_COMMANDS = ()
+        mock_config.SAVE_COMMANDS = ()
+        mock_config.HELP_COMMANDS = ()
+        mock_config.MODEL_COMMANDS = ()
+        mock_config.LIST_COMMANDS = ()
+        mock_config.LOAD_COMMANDS = ()
+
+        mock_display = MagicMock()
+        mock_display.prompt_input.side_effect = ["Olá", "sair"]
+        mock_display.stop_streaming.return_value = ""
+        mock_display_class.return_value = mock_display
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.send_message_stream.return_value = iter([""])
+        mock_client_class.return_value = mock_client
+
+        mock_conv = MagicMock()
+        mock_conv.get_messages.return_value = [{"role": "user", "content": "Olá"}]
+        mock_conv_class.return_value = mock_conv
+
+        main([])
+
+        mock_conv.remove_last_user_message.assert_called_once()
+        mock_display.show_info.assert_called()
+
 
 class TestParseArgs:
     """Testes para a função parse_args."""
