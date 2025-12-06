@@ -1,7 +1,35 @@
 """Cliente para a API OpenRouter."""
 
+import json
 import httpx
+import tiktoken
+from functools import lru_cache
+from typing import Generator
 from .config import config
+
+
+@lru_cache(maxsize=8)
+def _get_encoding(model: str) -> tiktoken.Encoding:
+    """Retorna encoding cacheado para o modelo."""
+    try:
+        return tiktoken.encoding_for_model(model)
+    except KeyError:
+        return tiktoken.get_encoding("cl100k_base")
+
+
+def count_tokens(text: str, model: str = "gpt-4") -> int:
+    """
+    Conta o número de tokens em um texto.
+
+    Args:
+        text: Texto para contar tokens.
+        model: Modelo para usar o encoding apropriado.
+
+    Returns:
+        Número de tokens.
+    """
+    encoding = _get_encoding(model)
+    return len(encoding.encode(text))
 
 
 class APIError(Exception):
@@ -100,6 +128,76 @@ class OpenRouterClient:
                 raise APIError("Resposta da API não contém conteúdo.")
 
             return content
+
+        except httpx.TimeoutException:
+            raise APIError("Tempo limite excedido. Verifique sua conexão.")
+        except httpx.ConnectError:
+            raise APIError("Não foi possível conectar à API. Verifique sua conexão.")
+
+    def send_message_stream(self, messages: list[dict]) -> Generator[str, None, None]:
+        """
+        Envia mensagens para a API e retorna a resposta em streaming.
+
+        Args:
+            messages: Lista de mensagens no formato OpenAI.
+
+        Yields:
+            Chunks de texto conforme chegam da API.
+
+        Raises:
+            APIError: Em caso de erro na comunicação.
+        """
+        if not self.api_key:
+            raise APIError(
+                "Chave da API não configurada. Configure OPENROUTER_API_KEY no arquivo .env"
+            )
+
+        if not messages:
+            raise APIError("Lista de mensagens não pode estar vazia.")
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+        }
+
+        try:
+            client = self._get_client()
+            with client.stream(
+                "POST",
+                self.base_url,
+                headers=self._get_headers(),
+                json=payload,
+            ) as response:
+                if response.status_code == 401:
+                    raise APIError("Chave de API inválida. Verifique sua configuração.")
+
+                if response.status_code == 429:
+                    raise APIError("Limite de requisições excedido. Tente novamente mais tarde.")
+
+                if response.status_code >= 400:
+                    response.read()
+                    error_detail = self._sanitize_error_message(response.text)
+                    raise APIError(f"Erro na API ({response.status_code}): {error_detail}")
+
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+
+                    data_str = line[6:]  # Remove "data: " prefix
+
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        data = json.loads(data_str)
+                        if "choices" in data and data["choices"]:
+                            delta = data["choices"][0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue
 
         except httpx.TimeoutException:
             raise APIError("Tempo limite excedido. Verifique sua conexão.")

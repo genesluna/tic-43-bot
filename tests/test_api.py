@@ -3,7 +3,39 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import httpx
-from utils.api import OpenRouterClient, APIError
+from utils.api import OpenRouterClient, APIError, count_tokens
+
+
+class TestCountTokens:
+    """Testes para a função count_tokens."""
+
+    def test_count_tokens_simple(self):
+        """Verifica contagem de tokens em texto simples."""
+        text = "Hello, world!"
+        tokens = count_tokens(text)
+
+        assert tokens > 0
+        assert isinstance(tokens, int)
+
+    def test_count_tokens_empty(self):
+        """Verifica contagem de tokens em texto vazio."""
+        tokens = count_tokens("")
+
+        assert tokens == 0
+
+    def test_count_tokens_portuguese(self):
+        """Verifica contagem de tokens em português."""
+        text = "Olá, como você está?"
+        tokens = count_tokens(text)
+
+        assert tokens > 0
+
+    def test_count_tokens_with_unknown_model(self):
+        """Verifica fallback para modelo desconhecido."""
+        text = "Test text"
+        tokens = count_tokens(text, model="unknown-model")
+
+        assert tokens > 0
 
 
 class TestOpenRouterClient:
@@ -173,3 +205,74 @@ class TestOpenRouterClient:
             client.send_message([{"role": "user", "content": "Olá"}])
 
         assert "não contém dados válidos" in str(exc_info.value)
+
+    def test_send_message_stream_without_api_key(self):
+        """Verifica se erro é levantado no streaming quando não há API key."""
+        with patch("utils.api.config") as mock_config:
+            mock_config.OPENROUTER_API_KEY = ""
+            mock_config.OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+            mock_config.OPENROUTER_MODEL = "openai/gpt-4o-mini"
+
+            client = OpenRouterClient()
+            client.api_key = ""
+
+            with pytest.raises(APIError) as exc_info:
+                list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
+
+            assert "Chave da API não configurada" in str(exc_info.value)
+
+    def test_send_message_stream_empty_messages(self):
+        """Verifica se erro é levantado quando lista de mensagens está vazia."""
+        client = OpenRouterClient()
+        client.api_key = "test_key"
+
+        with pytest.raises(APIError) as exc_info:
+            list(client.send_message_stream([]))
+
+        assert "Lista de mensagens não pode estar vazia" in str(exc_info.value)
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_stream_success(self, mock_client_class):
+        """Verifica se streaming funciona corretamente."""
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 200
+        mock_stream_response.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "Olá"}}]}',
+            'data: {"choices": [{"delta": {"content": "!"}}]}',
+            'data: {"choices": [{"delta": {"content": " Como"}}]}',
+            'data: {"choices": [{"delta": {"content": " vai?"}}]}',
+            'data: [DONE]',
+        ]
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client.api_key = "test_key"
+
+        chunks = list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
+
+        assert chunks == ["Olá", "!", " Como", " vai?"]
+
+    @patch("utils.api.httpx.Client")
+    def test_send_message_stream_unauthorized(self, mock_client_class):
+        """Verifica se erro 401 é tratado corretamente no streaming."""
+        mock_stream_response = MagicMock()
+        mock_stream_response.status_code = 401
+        mock_stream_response.__enter__ = MagicMock(return_value=mock_stream_response)
+        mock_stream_response.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_stream_response
+        mock_client_class.return_value = mock_client
+
+        client = OpenRouterClient()
+        client.api_key = "invalid_key"
+
+        with pytest.raises(APIError) as exc_info:
+            list(client.send_message_stream([{"role": "user", "content": "Olá"}]))
+
+        assert "Chave de API inválida" in str(exc_info.value)

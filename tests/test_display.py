@@ -178,3 +178,42 @@ class TestDisplay:
 
         display.stop_spinner()
         assert display.spinner.running is False
+
+    def test_update_spinner_tokens(self):
+        """Verifica se o contador de tokens pode ser atualizado."""
+        display = Display()
+
+        display.start_spinner()
+        display.update_spinner_tokens(50)
+
+        assert display.spinner.token_count == 50
+
+        display.stop_spinner()
+
+    def test_spinner_token_count_reset_on_start(self):
+        """Verifica se o contador de tokens é resetado ao iniciar."""
+        display = Display()
+
+        display.start_spinner()
+        display.update_spinner_tokens(100)
+        display.stop_spinner()
+
+        display.start_spinner()
+        assert display.spinner.token_count == 0
+        display.stop_spinner()
+
+    def test_spinner_renderable_with_tokens(self):
+        """Verifica se o renderable inclui tokens quando > 0."""
+        from rich.console import Console
+
+        console = Console()
+        spinner = RotatingSpinner(console)
+        spinner.start_time = 0
+        spinner.update_tokens(42)
+
+        renderable = spinner._get_renderable()
+
+        # Converte para string para verificar
+        text_str = str(renderable)
+        assert "42" in text_str
+        assert "tokens" in text_str

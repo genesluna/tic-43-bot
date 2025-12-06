@@ -1,14 +1,15 @@
 """Formatação e exibição no terminal."""
 
-import readline  # Habilita navegação com setas e histórico
+try:
+    import readline  # Habilita navegação com setas e histórico (Unix)
+except ImportError:
+    pass  # Windows não tem readline, mas funciona sem ele
+
 import random
 import time
 import threading
-import sys
 from rich.console import Console
-from rich.panel import Panel
 from rich.markdown import Markdown
-from rich.spinner import Spinner
 from rich.live import Live
 from rich.text import Text
 from .config import config
@@ -48,20 +49,42 @@ class RotatingSpinner:
         self.word_change_interval = 5.0
         self.last_word_change = 0
         self.start_time = 0
+        self._token_count = 0
+        self._lock = threading.Lock()
 
     def _get_renderable(self):
         char = self.spinner_chars[self.char_index]
         word = THINKING_WORDS[self.word_index]
         elapsed = int(time.time() - self.start_time)
-        return Text.assemble(
+        with self._lock:
+            current_tokens = self._token_count
+        parts = [
             (char, "cyan"),
             " ",
             (f"{word}…", "dim"),
             (" (esc para interromper", "dim"),
             (" · ", "dim"),
             (f"{elapsed}s", "dim"),
-            (")", "dim"),
-        )
+        ]
+        if current_tokens > 0:
+            parts.extend([
+                (" · ↓ ", "dim"),
+                (f"{current_tokens}", "dim"),
+                (" tokens", "dim"),
+            ])
+        parts.append((")", "dim"))
+        return Text.assemble(*parts)
+
+    def update_tokens(self, count: int) -> None:
+        """Atualiza o contador de tokens (thread-safe)."""
+        with self._lock:
+            self._token_count = count
+
+    @property
+    def token_count(self) -> int:
+        """Retorna o contador de tokens (thread-safe)."""
+        with self._lock:
+            return self._token_count
 
     def _animate(self):
         self.last_word_change = time.time()
@@ -77,6 +100,8 @@ class RotatingSpinner:
     def start(self):
         self.running = True
         self.start_time = time.time()
+        with self._lock:
+            self._token_count = 0
         self.word_index = random.randint(0, len(THINKING_WORDS) - 1)
         self.live = Live(self._get_renderable(), console=self.console, transient=True, refresh_per_second=12)
         self.live.start()
@@ -170,6 +195,10 @@ class Display:
     def stop_spinner(self) -> None:
         """Para o spinner de carregamento."""
         self.spinner.stop()
+
+    def update_spinner_tokens(self, count: int) -> None:
+        """Atualiza o contador de tokens no spinner."""
+        self.spinner.update_tokens(count)
 
     def show_model_info(self, model: str) -> None:
         """Exibe informação sobre o modelo atual."""
