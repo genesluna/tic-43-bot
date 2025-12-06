@@ -15,8 +15,30 @@ class ConversationManager:
 
     def __init__(self):
         self.messages: list[dict] = []
-        self.system_prompt = config.SYSTEM_PROMPT
+        self.system_prompt = self._build_system_prompt()
         self._init_system_message()
+
+    def _build_system_prompt(self) -> str:
+        """Constrói o system prompt com as configurações de personalização."""
+        parts = [config.SYSTEM_PROMPT]
+
+        instructions = []
+        if config.RESPONSE_LANGUAGE:
+            instructions.append(f"Responda em {config.RESPONSE_LANGUAGE}")
+        if config.RESPONSE_LENGTH:
+            instructions.append(f"seja {config.RESPONSE_LENGTH} nas respostas")
+        if config.RESPONSE_TONE:
+            instructions.append(f"use tom {config.RESPONSE_TONE}")
+        if config.RESPONSE_FORMAT:
+            if config.RESPONSE_FORMAT.lower() == "markdown":
+                instructions.append("use formatação markdown quando apropriado")
+            else:
+                instructions.append("use apenas texto simples sem formatação")
+
+        if instructions:
+            parts.append(". ".join(instructions) + ".")
+
+        return " ".join(parts)
 
     def _init_system_message(self) -> None:
         """Inicializa com a mensagem de sistema."""

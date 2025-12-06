@@ -21,8 +21,13 @@ class Config:
 
     SYSTEM_PROMPT: str = os.getenv(
         "SYSTEM_PROMPT",
-        "Você é um assistente virtual útil e amigável. Responda de forma clara e concisa.",
+        "Você é um assistente virtual útil e amigável.",
     )
+
+    RESPONSE_LANGUAGE: str = os.getenv("RESPONSE_LANGUAGE", "português")
+    RESPONSE_LENGTH: str = os.getenv("RESPONSE_LENGTH", "conciso")
+    RESPONSE_TONE: str = os.getenv("RESPONSE_TONE", "amigável")
+    RESPONSE_FORMAT: str = os.getenv("RESPONSE_FORMAT", "markdown")
 
     EXIT_COMMANDS: tuple = ("sair", "exit", "quit")
     CLEAR_COMMANDS: tuple = ("/limpar", "/clear")

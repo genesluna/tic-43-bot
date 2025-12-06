@@ -100,11 +100,35 @@ Você: sair
 
 As seguintes variáveis podem ser configuradas no arquivo `.env`:
 
-| Variável             | Descrição                | Padrão               |
-| -------------------- | ------------------------ | -------------------- |
-| `OPENROUTER_API_KEY` | Chave da API OpenRouter  | (obrigatório)        |
-| `OPENROUTER_MODEL`   | Modelo de IA a utilizar  | `openai/gpt-4o-mini` |
-| `SYSTEM_PROMPT`      | Personalidade do chatbot | Assistente amigável  |
+| Variável             | Descrição                    | Padrão                                     |
+| -------------------- | ---------------------------- | ------------------------------------------ |
+| `OPENROUTER_API_KEY` | Chave da API OpenRouter      | (obrigatório)                              |
+| `OPENROUTER_MODEL`   | Modelo de IA a utilizar      | `openai/gpt-4o-mini`                       |
+| `SYSTEM_PROMPT`      | Persona do chatbot           | `Você é um assistente virtual útil...`     |
+| `RESPONSE_LANGUAGE`  | Idioma das respostas         | `português`                                |
+| `RESPONSE_LENGTH`    | Tamanho das respostas        | `conciso`                                  |
+| `RESPONSE_TONE`      | Tom/estilo das respostas     | `amigável`                                 |
+| `RESPONSE_FORMAT`    | Formato do texto             | `markdown`                                 |
+
+### Exemplos de Personalização
+
+**Assistente técnico formal:**
+```env
+SYSTEM_PROMPT=Você é um especialista em tecnologia.
+RESPONSE_LANGUAGE=português
+RESPONSE_LENGTH=detalhado
+RESPONSE_TONE=técnico
+RESPONSE_FORMAT=markdown
+```
+
+**Assistente casual em inglês:**
+```env
+SYSTEM_PROMPT=You are a friendly assistant.
+RESPONSE_LANGUAGE=inglês
+RESPONSE_LENGTH=conciso
+RESPONSE_TONE=casual
+RESPONSE_FORMAT=texto
+```
 
 ### Modelos Disponíveis
 
