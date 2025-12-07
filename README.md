@@ -256,6 +256,13 @@ Para documentação completa, consulte a [Wiki do projeto](https://github.com/ge
 - [Segurança](https://github.com/genesluna/tic-43-bot/wiki/Segurança) - Controles implementados
 - [FAQ](https://github.com/genesluna/tic-43-bot/wiki/FAQ) - Perguntas frequentes
 
+### Documentos do Projeto
+
+| Documento | Descrição |
+|-----------|-----------|
+| [ENTREGA_FINAL.md](ENTREGA_FINAL.md) | Relatório de entrega final com comparativo PRD vs produto |
+| [TIC_43_BOT_PRD.md](TIC_43_BOT_PRD.md) | Product Requirements Document original |
+
 ---
 
 ## Licença
