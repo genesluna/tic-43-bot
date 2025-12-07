@@ -4,14 +4,19 @@ import json
 import logging
 import random
 import re
+import ssl
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 import httpx
 from typing import Any, Generator, Self
 from .config import config, MAX_MESSAGE_CONTENT_SIZE
+from .version import __version__
 
 __all__ = ["OpenRouterClient", "APIError", "RateLimitError", "StreamingResponse", "APIResponse"]
+
+USER_AGENT = f"TIC43-Chatbot/{__version__}"
 
 
 @dataclass
@@ -52,6 +57,19 @@ SSE_LOG_MAX_LENGTH = 100
 # Valid message roles
 VALID_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
 
+# Pattern to match control characters for log sanitization
+_CONTROL_CHARS_PATTERN = re.compile(r'[\x00-\x1f\x7f-\x9f]')
+
+
+def _sanitize_for_logging(text: str) -> str:
+    """Remove caracteres de controle que podem manipular logs."""
+    return _CONTROL_CHARS_PATTERN.sub('', text)
+
+
+def _generate_request_id() -> str:
+    """Gera ID único para correlação de requisições nos logs."""
+    return uuid.uuid4().hex[:8]
+
 
 class APIError(Exception):
     """Erro de comunicação com a API."""
@@ -63,6 +81,11 @@ class StreamingResponse:
     Esta classe encapsula o generator de streaming e garante que o contador
     de requisições ativas seja decrementado mesmo quando o generator é
     abandonado (não consumido completamente) ou uma exceção ocorre.
+
+    Uso recomendado com context manager:
+        with client.send_message_stream(messages) as stream:
+            for chunk in stream:
+                process(chunk)
     """
 
     def __init__(self, client: "OpenRouterClient", generator: Generator[str, None, None]) -> None:
@@ -70,9 +93,16 @@ class StreamingResponse:
         self._generator = generator
         self._closed = False
         self._cleanup_lock = threading.Lock()
+        self._cleanup_via_del = False
 
     def __repr__(self) -> str:
         return f"StreamingResponse(closed={self._closed})"
+
+    def __enter__(self) -> "StreamingResponse":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.close()
 
     def __iter__(self) -> "StreamingResponse":
         return self
@@ -95,8 +125,14 @@ class StreamingResponse:
             if not self._closed:
                 self._closed = True
                 self._client._end_request()
+                if self._cleanup_via_del:
+                    logger.warning(
+                        "StreamingResponse cleanup via __del__ - "
+                        "considere usar 'with' statement ou chamar close()"
+                    )
 
     def __del__(self) -> None:
+        self._cleanup_via_del = True
         self._cleanup()
 
     def close(self) -> None:
@@ -152,7 +188,9 @@ class OpenRouterClient:
                     write=config.HTTP_WRITE_TIMEOUT,
                     pool=config.HTTP_POOL_TIMEOUT,
                 )
-                self._client = httpx.Client(timeout=timeout)
+                ssl_context = ssl.create_default_context()
+                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+                self._client = httpx.Client(timeout=timeout, verify=ssl_context)
             return self._client
 
     def _begin_request(self) -> None:
@@ -176,15 +214,17 @@ class OpenRouterClient:
         return {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
         }
 
     def _sanitize_error_message(self, response_text: str, max_length: int = ERROR_MESSAGE_MAX_LENGTH) -> str:
         """Sanitiza mensagem de erro para não expor informações sensíveis."""
         if not response_text:
             return "Sem detalhes disponíveis"
+        # Padrão abrangente para credenciais em vários formatos (JSON, headers, query strings)
         sanitized = re.sub(
-            r'(api[_-]?key|token|secret|password)["\s:=]+\S+',
-            r'\1=[REDACTED]',
+            r'(["\']?(?:api[-_]?key|token|secret|password|auth|credential|key)["\']?\s*[:=]\s*)["\']?[^\s"\',$}\]]+["\']?',
+            r'\1[REDACTED]',
             response_text,
             flags=re.IGNORECASE
         )
@@ -204,7 +244,9 @@ class OpenRouterClient:
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             try:
-                return float(retry_after)
+                value = float(retry_after)
+                if value > 0:
+                    return value
             except ValueError:
                 pass
         return None
@@ -355,9 +397,11 @@ class OpenRouterClient:
             APIError: Em caso de erro na comunicação.
             RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
+        request_id = _generate_request_id()
         payload = self._prepare_request(messages)
         last_error: Exception | None = None
 
+        logger.debug("[%s] Enviando requisição com %d mensagens", request_id, len(messages))
         self._begin_request()
         try:
             for attempt in range(DEFAULT_MAX_RETRIES):
@@ -371,6 +415,7 @@ class OpenRouterClient:
 
                     should_proceed, error = self._handle_response_error(response, attempt)
                     if error:
+                        logger.debug("[%s] Erro na resposta: %s", request_id, error)
                         raise error
                     if not should_proceed:
                         continue
@@ -386,10 +431,11 @@ class OpenRouterClient:
 
                     total_tokens = data.get("usage", {}).get("total_tokens", 0)
 
-                    logger.debug("Resposta recebida (%d chars, %d tokens)", len(content), total_tokens)
+                    logger.debug("[%s] Resposta recebida (%d chars, %d tokens)", request_id, len(content), total_tokens)
                     return APIResponse(content=content, total_tokens=total_tokens)
 
                 except (httpx.TimeoutException, httpx.ConnectError) as e:
+                    logger.debug("[%s] Erro de rede: %s", request_id, type(e).__name__)
                     should_retry, last_error = self._handle_network_error(e, attempt)
                     if should_retry:
                         continue
@@ -416,8 +462,9 @@ class OpenRouterClient:
             APIError: Em caso de erro na comunicação.
             RateLimitError: Quando o limite de requisições é excedido após retentativas.
         """
+        request_id = _generate_request_id()
         payload = self._prepare_request(messages, stream=True)
-        logger.debug("Iniciando streaming com %d mensagens", len(messages))
+        logger.debug("[%s] Iniciando streaming com %d mensagens", request_id, len(messages))
         self._begin_request()
 
         def _stream_generator() -> Generator[str, None, None]:
@@ -467,7 +514,7 @@ class OpenRouterClient:
                                 parse_errors += 1
                                 logger.warning(
                                     "Falha ao parsear SSE: %s - dados: %s",
-                                    e, data_str[:SSE_LOG_MAX_LENGTH]
+                                    e, _sanitize_for_logging(data_str[:SSE_LOG_MAX_LENGTH])
                                 )
                                 continue
 

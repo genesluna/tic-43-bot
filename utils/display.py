@@ -367,7 +367,7 @@ class Display:
             ("/listar, /list", "Lista históricos salvos"),
             ("/carregar, /load", "Carrega histórico de arquivo"),
             ("/ajuda, /help", "Mostra esta mensagem"),
-            ("/modelo, /model [nome]", "Mostra ou altera o modelo atual"),
+            ("/modelo, /model \\[nome]", "Mostra ou altera o modelo atual"),
             ("/streaming, /stream", "Alterna modo streaming on/off"),
         ]
         for cmd, desc in commands:

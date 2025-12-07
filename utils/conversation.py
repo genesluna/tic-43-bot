@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import TypedDict
@@ -11,6 +13,8 @@ from typing import TypedDict
 from .config import config, MAX_MESSAGE_CONTENT_SIZE
 
 __all__ = ["ConversationManager", "ConversationLoadError", "Message"]
+
+MAX_HISTORY_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 logger = logging.getLogger(__name__)
 
@@ -164,8 +168,20 @@ class ConversationManager:
         }
 
         try:
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(history, f, ensure_ascii=False, indent=2)
+            # Escrita atômica: escreve em arquivo temporário e move
+            # Isso evita arquivos corrompidos em caso de falha ou disco cheio
+            fd, tmp_path = tempfile.mkstemp(suffix='.json', dir=save_dir)
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(history, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                shutil.move(tmp_path, filepath)
+            except Exception:
+                # Remove arquivo temporário em caso de erro
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
             logger.info("Histórico salvo: %s (%d mensagens)", filepath, len(history['messages']))
             return str(filepath)
         except (OSError, PermissionError) as e:
@@ -194,6 +210,12 @@ class ConversationManager:
         files = []
         for filepath in history_dir.glob("*.json"):
             try:
+                if filepath.is_symlink():
+                    logger.debug("Symlink ignorado: %s", filepath)
+                    continue
+                if filepath.stat().st_size > MAX_HISTORY_FILE_SIZE:
+                    logger.debug("Arquivo muito grande ignorado: %s", filepath)
+                    continue
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 timestamp = data.get("timestamp", "Desconhecido")
@@ -228,6 +250,21 @@ class ConversationManager:
         if not path.exists():
             logger.warning("Tentativa de carregar arquivo inexistente: %s", path)
             raise ConversationLoadError(f"Arquivo não encontrado: {path}")
+
+        if path.is_symlink():
+            logger.warning("Tentativa de carregar symlink: %s", path)
+            raise ConversationLoadError("Links simbólicos não são permitidos")
+
+        file_size = path.stat().st_size
+        if file_size > MAX_HISTORY_FILE_SIZE:
+            logger.warning(
+                "Arquivo muito grande: %s (%d bytes, limite: %d)",
+                path, file_size, MAX_HISTORY_FILE_SIZE
+            )
+            raise ConversationLoadError(
+                f"Arquivo muito grande ({file_size // 1024 // 1024}MB). "
+                f"Limite: {MAX_HISTORY_FILE_SIZE // 1024 // 1024}MB"
+            )
 
         try:
             with open(path, "r", encoding="utf-8") as f:

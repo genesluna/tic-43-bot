@@ -1,11 +1,15 @@
 """Configurações do chatbot carregadas do ambiente."""
 
+import logging
 import os
 import threading
+from pathlib import Path
 from typing import Any, Callable, TypeVar
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Limite máximo de caracteres por mensagem armazenada/enviada à API.
 # Diferente de MAX_MESSAGE_LENGTH (limite de entrada do usuário para UX).
@@ -126,7 +130,23 @@ class Config:
 
     @_ThreadSafeCachedProperty
     def HISTORY_DIR(self) -> str:
-        return os.getenv("HISTORY_DIR", "./history")
+        """Diretório para salvar histórico de conversas.
+
+        Valida que o caminho está dentro ou abaixo do diretório de trabalho
+        para evitar escrita em locais não autorizados.
+        """
+        path = os.getenv("HISTORY_DIR", "./history")
+        try:
+            resolved = Path(path).resolve()
+            cwd = Path.cwd().resolve()
+            resolved.relative_to(cwd)
+            return path
+        except ValueError:
+            logger.warning(
+                "HISTORY_DIR '%s' fora do diretório do projeto, usando padrão",
+                path
+            )
+            return "./history"
 
     @_ThreadSafeCachedProperty
     def STREAM_RESPONSE(self) -> bool:
