@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-318_passing-brightgreen.svg)](#testes)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testes)
+[![Coverage](https://img.shields.io/badge/coverage->80%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -23,7 +23,8 @@ Um chatbot interativo via terminal que utiliza modelos de IA generativa através
 | **Streaming**            | Modo streaming ou contagem de tokens animada (configurável)     |
 | **Retry Inteligente**    | Recuperação automática de erros de rede com backoff exponencial |
 | **Personalizável**       | System prompt, idioma, tom e formato configuráveis              |
-| **Salvamento**           | Exporta conversas para JSON                                     |
+| **Salvamento**           | Exporta conversas para JSON com nome personalizado              |
+| **Autocompletar**        | Tab para completar comandos e nomes de arquivo                  |
 | **Segurança**            | TLS 1.2+, validação de entrada, proteção contra path traversal  |
 
 ---
@@ -95,16 +96,16 @@ python chatbot.py --log-file app.log  # Salva logs em arquivo
 
 ### Comandos Disponíveis
 
-| Comando                                  | Descrição                         |
-| ---------------------------------------- | --------------------------------- |
-| `sair`, `exit`, `quit`                   | Encerra o chatbot                 |
-| `/limpar`, `/clear`                      | Limpa o histórico da conversa     |
-| `/salvar`, `/save`                       | Salva o histórico em arquivo JSON |
-| `/listar`, `/list`                       | Lista históricos salvos           |
-| `/carregar <arquivo>`, `/load <arquivo>` | Carrega histórico de arquivo      |
-| `/ajuda`, `/help`                        | Mostra comandos disponíveis       |
-| `/modelo [nome]`, `/model [nome]`        | Mostra ou altera o modelo atual   |
-| `/streaming`, `/stream`                  | Alterna modo streaming on/off     |
+| Comando                                  | Descrição                              |
+| ---------------------------------------- | -------------------------------------- |
+| `sair`, `exit`, `quit`                   | Encerra o chatbot                      |
+| `/limpar`, `/clear`                      | Limpa o histórico da conversa          |
+| `/salvar [nome]`, `/save [nome]`         | Salva histórico (nome opcional)        |
+| `/listar`, `/list`                       | Lista históricos salvos                |
+| `/carregar <arquivo>`, `/load <arquivo>` | Carrega histórico (Tab autocompleta)   |
+| `/ajuda`, `/help`                        | Mostra comandos disponíveis            |
+| `/modelo [nome]`, `/model [nome]`        | Mostra ou altera o modelo atual        |
+| `/streaming`, `/stream`                  | Alterna modo streaming on/off          |
 
 ### Exemplo de Conversa
 
@@ -202,7 +203,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui uma suíte de testes abrangente com 318 testes e 93% de cobertura.
+O projeto possui uma suíte de testes abrangente com 338 testes e 92% de cobertura.
 
 ```bash
 # Executar testes
