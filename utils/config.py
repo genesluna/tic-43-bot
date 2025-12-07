@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 # Diferente de MAX_MESSAGE_LENGTH (limite de entrada do usuário para UX).
 MAX_MESSAGE_CONTENT_SIZE = 100_000
 
+# Upper bounds para configurações (previne DoS por configuração incorreta)
+MAX_MESSAGE_LENGTH_UPPER = 100_000
+MAX_HISTORY_SIZE_UPPER = 500
+
 __all__ = ["Config", "ConfigurationError", "config", "MAX_MESSAGE_CONTENT_SIZE"]
 
 
@@ -117,7 +121,7 @@ class Config:
         Este limite é para UX no input. O limite técnico para mensagens
         armazenadas/enviadas à API é definido por MAX_MESSAGE_CONTENT_SIZE.
         """
-        return self._get_int_env("MAX_MESSAGE_LENGTH", 10000)
+        return self._get_int_env("MAX_MESSAGE_LENGTH", 10000, MAX_MESSAGE_LENGTH_UPPER)
 
     @_ThreadSafeCachedProperty
     def MAX_HISTORY_SIZE(self) -> int:
@@ -126,7 +130,7 @@ class Config:
         O histórico mantém o system prompt + até MAX_HISTORY_SIZE * 2 mensagens
         individuais, garantindo que pares completos de conversa sejam preservados.
         """
-        return self._get_int_env("MAX_HISTORY_SIZE", 25)
+        return self._get_int_env("MAX_HISTORY_SIZE", 25, MAX_HISTORY_SIZE_UPPER)
 
     @_ThreadSafeCachedProperty
     def HISTORY_DIR(self) -> str:
@@ -196,7 +200,7 @@ class Config:
             )
         return value
 
-    def _get_int_env(self, name: str, default: int) -> int:
+    def _get_int_env(self, name: str, default: int, max_value: int | None = None) -> int:
         """Obtém variável de ambiente como inteiro positivo com validação."""
         raw_value = os.getenv(name, str(default))
         try:
@@ -209,6 +213,12 @@ class Config:
             raise ConfigurationError(
                 f"{name} deve ser um inteiro positivo, recebido: '{value}'"
             )
+        if max_value is not None and value > max_value:
+            logger.warning(
+                "%s=%d excede máximo permitido (%d), usando limite",
+                name, value, max_value
+            )
+            return max_value
         return value
 
     def validate(self) -> None:

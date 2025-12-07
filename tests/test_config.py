@@ -335,3 +335,43 @@ class TestThreadSafeCachedProperty:
 
         prop = TestClass.__dict__["my_property"]
         assert prop.attr_name == "my_property"
+
+
+class TestConfigUpperBounds:
+    """Testes para limites superiores de configuração."""
+
+    def test_max_message_length_respects_upper_bound(self, monkeypatch):
+        """MAX_MESSAGE_LENGTH é limitado ao máximo permitido."""
+        from utils.config import Config, MAX_MESSAGE_LENGTH_UPPER
+
+        monkeypatch.setenv("MAX_MESSAGE_LENGTH", str(MAX_MESSAGE_LENGTH_UPPER + 1000))
+        cfg = Config()
+
+        assert cfg.MAX_MESSAGE_LENGTH == MAX_MESSAGE_LENGTH_UPPER
+
+    def test_max_history_size_respects_upper_bound(self, monkeypatch):
+        """MAX_HISTORY_SIZE é limitado ao máximo permitido."""
+        from utils.config import Config, MAX_HISTORY_SIZE_UPPER
+
+        monkeypatch.setenv("MAX_HISTORY_SIZE", str(MAX_HISTORY_SIZE_UPPER + 100))
+        cfg = Config()
+
+        assert cfg.MAX_HISTORY_SIZE == MAX_HISTORY_SIZE_UPPER
+
+    def test_max_message_length_within_bound_unchanged(self, monkeypatch):
+        """MAX_MESSAGE_LENGTH dentro do limite não é alterado."""
+        from utils.config import Config
+
+        monkeypatch.setenv("MAX_MESSAGE_LENGTH", "5000")
+        cfg = Config()
+
+        assert cfg.MAX_MESSAGE_LENGTH == 5000
+
+    def test_max_history_size_within_bound_unchanged(self, monkeypatch):
+        """MAX_HISTORY_SIZE dentro do limite não é alterado."""
+        from utils.config import Config
+
+        monkeypatch.setenv("MAX_HISTORY_SIZE", "100")
+        cfg = Config()
+
+        assert cfg.MAX_HISTORY_SIZE == 100

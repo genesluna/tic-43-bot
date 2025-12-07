@@ -152,7 +152,7 @@ class ConversationManager:
             IOError: Em caso de erro ao salvar.
         """
         save_dir = Path(config.HISTORY_DIR)
-        save_dir.mkdir(exist_ok=True)
+        save_dir.mkdir(exist_ok=True, mode=0o700)
 
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -179,8 +179,11 @@ class ConversationManager:
                 shutil.move(tmp_path, filepath)
             except Exception:
                 # Remove arquivo temporário em caso de erro
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+                try:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except OSError as cleanup_error:
+                    logger.warning("Falha ao remover arquivo temporário %s: %s", tmp_path, cleanup_error)
                 raise
             logger.info("Histórico salvo: %s (%d mensagens)", filepath, len(history['messages']))
             return str(filepath)
@@ -291,7 +294,10 @@ class ConversationManager:
                 raise ConversationLoadError(f"Mensagem {i} sem 'role' ou 'content'")
             if msg["role"] not in ("user", "assistant"):
                 raise ConversationLoadError(f"Mensagem {i} com role inválido: {msg['role']}")
-            if len(msg.get("content", "")) > MAX_MESSAGE_CONTENT_SIZE:
+            content = msg.get("content")
+            if not isinstance(content, str):
+                raise ConversationLoadError(f"Mensagem {i} com 'content' não-string")
+            if len(content) > MAX_MESSAGE_CONTENT_SIZE:
                 raise ConversationLoadError(f"Mensagem {i} excede tamanho máximo")
 
         self._init_system_message()

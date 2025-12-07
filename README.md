@@ -2,8 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testes)
-[![Coverage](https://img.shields.io/badge/coverage->80%25-brightgreen.svg)](#testes)
+[![Tests](https://img.shields.io/badge/tests-318_passing-brightgreen.svg)](#testes)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#testes)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -24,6 +24,26 @@ Um chatbot interativo via terminal que utiliza modelos de IA generativa através
 | **Retry Inteligente**    | Recuperação automática de erros de rede com backoff exponencial |
 | **Personalizável**       | System prompt, idioma, tom e formato configuráveis              |
 | **Salvamento**           | Exporta conversas para JSON                                     |
+| **Segurança**            | TLS 1.2+, validação de entrada, proteção contra path traversal  |
+
+---
+
+## Segurança
+
+O projeto implementa práticas de segurança robustas:
+
+| Controle | Descrição |
+|----------|-----------|
+| **Dependências fixas** | Versões pinadas para proteção contra supply chain attacks |
+| **TLS 1.2+** | Comunicação segura com enforcement de versão mínima |
+| **Validação de entrada** | Limites de tamanho, validação de tipos e roles |
+| **Proteção de credenciais** | Mascaramento de API keys em logs e erros |
+| **Path traversal** | Sanitização de nomes de arquivo e validação de diretório |
+| **Symlink protection** | Rejeição de links simbólicos em operações de arquivo |
+| **Escrita atômica** | Arquivos temporários para prevenir corrupção |
+| **Thread-safety** | Locks e condições para operações concorrentes |
+| **Rate limiting** | Exponential backoff com jitter para retentativas |
+| **Correlação de logs** | Request IDs para rastreabilidade |
 
 ---
 
@@ -182,7 +202,7 @@ Consulte a [lista completa](https://openrouter.ai/models) no OpenRouter.
 
 ## Testes
 
-O projeto possui uma suíte de testes abrangente com mais de 80% de cobertura.
+O projeto possui uma suíte de testes abrangente com 318 testes e 93% de cobertura.
 
 ```bash
 # Executar testes
@@ -204,8 +224,11 @@ chatbot-tic43/
 │   ├── config.py          # Configurações via ambiente
 │   ├── conversation.py    # Gerenciamento de histórico
 │   ├── display.py         # Interface rica do terminal
-│   └── logging_config.py  # Configuração de logging estruturado
+│   ├── logging_config.py  # Configuração de logging estruturado
+│   └── version.py         # Versão centralizada do projeto
 ├── tests/
+│   ├── conftest.py            # Fixtures compartilhados
+│   ├── helpers.py             # Utilitários de teste
 │   ├── test_api.py            # Testes do cliente API
 │   ├── test_chatbot.py        # Testes do módulo principal
 │   ├── test_config.py         # Testes de configuração
@@ -213,7 +236,7 @@ chatbot-tic43/
 │   ├── test_display.py        # Testes da interface do terminal
 │   ├── test_integration.py    # Testes de integração
 │   └── test_logging_config.py # Testes do sistema de logging
-├── requirements.txt       # Dependências de produção
+├── requirements.txt       # Dependências de produção (versões fixas)
 ├── requirements-dev.txt   # Dependências de desenvolvimento
 └── .env.example           # Template de configuração
 ```

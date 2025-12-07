@@ -365,6 +365,29 @@ class TestLoadFromFile:
 
             assert "muito grande" in str(exc_info.value)
 
+    def test_load_from_file_non_string_content(self, tmp_path):
+        """Mensagem com content não-string deve levantar ConversationLoadError."""
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "test.json"
+        test_file.write_text('{"messages": [{"role": "user", "content": 123}]}')
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("test.json")
+
+            assert "não-string" in str(exc_info.value)
+
     def test_load_from_file_non_dict_root(self, tmp_path):
         """JSON com raiz não-dicionário deve levantar ConversationLoadError."""
         history_dir = tmp_path / "history"
