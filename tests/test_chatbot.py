@@ -1,8 +1,9 @@
 """Testes para o módulo principal do chatbot."""
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from chatbot import handle_command, main, CommandResult
+from tests.helpers import create_mock_stream
 
 
 class TestHandleCommand:
@@ -443,7 +444,7 @@ class TestMain:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter([""])
+        mock_client.send_message_stream.return_value = create_mock_stream([""])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()
@@ -481,7 +482,7 @@ class TestMain:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter([])
+        mock_client.send_message_stream.return_value = create_mock_stream([])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()
@@ -521,7 +522,7 @@ class TestMain:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter(["Resposta ", "completa"])
+        mock_client.send_message_stream.return_value = create_mock_stream(["Resposta ", "completa"])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()
@@ -561,7 +562,7 @@ class TestMain:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter(["Resposta ", "da API"])
+        mock_client.send_message_stream.return_value = create_mock_stream(["Resposta ", "da API"])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()
@@ -599,7 +600,7 @@ class TestMain:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter(["Resposta"])
+        mock_client.send_message_stream.return_value = create_mock_stream(["Resposta"])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()

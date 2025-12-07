@@ -28,6 +28,8 @@ class TestOpenRouterClient:
         assert "Authorization" in headers
         assert "Content-Type" in headers
         assert headers["Content-Type"] == "application/json"
+        assert "User-Agent" in headers
+        assert "TIC43-Chatbot" in headers["User-Agent"]
 
     def test_get_model(self):
         """Verifica se o modelo pode ser obtido."""
@@ -885,6 +887,72 @@ class TestStreamingResponse:
 
         assert client._active_requests == 0
 
+    def test_context_manager_enter(self):
+        """Verifica que __enter__ retorna self."""
+        client = OpenRouterClient()
+        response = StreamingResponse(client, iter(["a", "b"]))
+
+        result = response.__enter__()
+
+        assert result is response
+
+    def test_context_manager_exit_cleanup(self):
+        """Verifica que __exit__ dispara cleanup."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b"]))
+
+        response.__enter__()
+        next(response)
+        response.__exit__(None, None, None)
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_context_manager_with_statement(self):
+        """Verifica uso com 'with' statement."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        chunks = ["a", "b", "c"]
+        response = StreamingResponse(client, iter(chunks))
+
+        result = []
+        with response as stream:
+            for chunk in stream:
+                result.append(chunk)
+
+        assert result == chunks
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_context_manager_with_break(self):
+        """Verifica cleanup quando 'with' é abandonado com break."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b", "c"]))
+
+        with response as stream:
+            next(stream)
+            # Simula break saindo do loop sem consumir generator
+            pass
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
+    def test_context_manager_with_exception(self):
+        """Verifica cleanup quando exceção ocorre dentro do 'with'."""
+        client = OpenRouterClient()
+        client._active_requests = 1
+        response = StreamingResponse(client, iter(["a", "b", "c"]))
+
+        with pytest.raises(RuntimeError):
+            with response as stream:
+                next(stream)
+                raise RuntimeError("Test error")
+
+        assert client._active_requests == 0
+        assert response._closed is True
+
 
 class TestStreamingResponseCleanup:
     """Testes de cleanup do StreamingResponse em cenários reais."""
@@ -1175,3 +1243,52 @@ class TestStreamingNetworkErrors:
 
         assert len(chunks) == 1
         assert client._active_requests == 0
+
+
+class TestLogSanitization:
+    """Testes para a função de sanitização de logs."""
+
+    def test_sanitize_removes_control_characters(self):
+        """Verifica remoção de caracteres de controle."""
+        from utils.api import _sanitize_for_logging
+
+        text_with_controls = "Hello\x00World\x1fTest\x7f"
+        result = _sanitize_for_logging(text_with_controls)
+
+        assert result == "HelloWorldTest"
+
+    def test_sanitize_removes_ansi_escape_codes(self):
+        """Verifica remoção de códigos ANSI de escape."""
+        from utils.api import _sanitize_for_logging
+
+        text_with_ansi = "Hello\x1b[31mRed\x1b[0m"
+        result = _sanitize_for_logging(text_with_ansi)
+
+        assert "\x1b" not in result
+        assert "Hello" in result
+        assert "Red" in result
+
+    def test_sanitize_preserves_normal_text(self):
+        """Verifica que texto normal é preservado."""
+        from utils.api import _sanitize_for_logging
+
+        normal_text = "Hello World! 123 áéíóú çÇ"
+        result = _sanitize_for_logging(normal_text)
+
+        assert result == normal_text
+
+    def test_sanitize_empty_string(self):
+        """Verifica que string vazia retorna vazia."""
+        from utils.api import _sanitize_for_logging
+
+        result = _sanitize_for_logging("")
+
+        assert result == ""
+
+    def test_sanitize_only_control_chars(self):
+        """Verifica que string só com controles retorna vazia."""
+        from utils.api import _sanitize_for_logging
+
+        result = _sanitize_for_logging("\x00\x01\x02\x1f")
+
+        assert result == ""

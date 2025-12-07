@@ -232,7 +232,7 @@ class TestConversationManager:
         manager = ConversationManager()
         manager.add_user_message("Teste")
 
-        with patch("builtins.open", side_effect=PermissionError("Acesso negado")):
+        with patch("utils.conversation.tempfile.mkstemp", side_effect=PermissionError("Acesso negado")):
             with pytest.raises(IOError) as exc_info:
                 manager.save_to_file("test.json")
 
@@ -339,6 +339,31 @@ class TestLoadFromFile:
                 manager.load_from_file("nonexistent.json")
 
             assert "não encontrado" in str(exc_info.value)
+
+    def test_load_from_file_too_large(self, tmp_path):
+        """Arquivo muito grande deve levantar ConversationLoadError."""
+        from utils.conversation import MAX_HISTORY_FILE_SIZE
+
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+        test_file = history_dir / "large.json"
+        test_file.write_bytes(b"x" * (MAX_HISTORY_FILE_SIZE + 1))
+
+        with patch("utils.conversation.config") as mock_config:
+            mock_config.HISTORY_DIR = str(history_dir)
+            mock_config.SYSTEM_PROMPT = "Test"
+            mock_config.RESPONSE_LANGUAGE = ""
+            mock_config.RESPONSE_LENGTH = ""
+            mock_config.RESPONSE_TONE = ""
+            mock_config.RESPONSE_FORMAT = ""
+            mock_config.MAX_HISTORY_SIZE = 50
+
+            manager = ConversationManager()
+
+            with pytest.raises(ConversationLoadError) as exc_info:
+                manager.load_from_file("large.json")
+
+            assert "muito grande" in str(exc_info.value)
 
     def test_load_from_file_non_dict_root(self, tmp_path):
         """JSON com raiz não-dicionário deve levantar ConversationLoadError."""

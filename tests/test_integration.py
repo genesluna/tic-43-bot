@@ -1,10 +1,9 @@
 """Testes de integração para o chatbot."""
 
-import pytest
 from unittest.mock import patch, MagicMock
-from io import StringIO
 
 from chatbot import main, handle_command, CommandResult
+from tests.helpers import create_mock_stream
 from utils.api import OpenRouterClient, APIError
 from utils.conversation import ConversationManager
 from utils.display import Display
@@ -127,7 +126,7 @@ class TestMainIntegration:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.send_message_stream.return_value = iter(["Olá", "!", " Como posso ajudar?"])
+        mock_client.send_message_stream.return_value = create_mock_stream(["Olá", "!", " Como posso ajudar?"])
         mock_client_class.return_value = mock_client
 
         mock_conv = MagicMock()

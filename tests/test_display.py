@@ -3,8 +3,7 @@
 import pytest
 import threading
 import time
-from unittest.mock import patch, MagicMock
-from io import StringIO
+from unittest.mock import patch
 from utils.display import Display, RotatingSpinner, StreamingTextDisplay, THINKING_WORDS
 
 

@@ -6,8 +6,6 @@ import os
 import tempfile
 from unittest.mock import patch
 
-import pytest
-
 from utils.logging_config import (
     ConsoleFormatter,
     StructuredFormatter,

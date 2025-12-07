@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+from tests.helpers import create_mock_stream, MockStreamingResponse
+
 
 # =============================================================================
 # Mock Config Fixtures
@@ -108,7 +110,7 @@ def mock_api_client():
     mock_client = MagicMock()
     mock_client.__enter__ = MagicMock(return_value=mock_client)
     mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.send_message_stream.return_value = iter(["Resposta", " de", " teste"])
+    mock_client.send_message_stream.return_value = create_mock_stream(["Resposta", " de", " teste"])
     return mock_client
 
 
