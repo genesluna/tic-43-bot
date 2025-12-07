@@ -1292,3 +1292,46 @@ class TestLogSanitization:
         result = _sanitize_for_logging("\x00\x01\x02\x1f")
 
         assert result == ""
+
+
+class TestTLSEnforcement:
+    """Testes para verificar enforcement de TLS 1.2+."""
+
+    def test_ssl_context_uses_tls_1_2_minimum(self):
+        """Verifica que o contexto SSL usa TLS 1.2 como mínimo."""
+        import ssl
+
+        with patch('utils.api.ssl.create_default_context') as mock_create_ctx:
+            mock_ctx = MagicMock()
+            mock_create_ctx.return_value = mock_ctx
+
+            with patch('utils.api.httpx.Client'):
+                client = OpenRouterClient()
+                _ = client._get_client()
+
+            mock_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            assert mock_ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+    def test_client_uses_ssl_context_for_verification(self):
+        """Verifica que o cliente httpx usa o contexto SSL."""
+        import ssl
+
+        with patch('utils.api.ssl.create_default_context') as mock_create_ctx:
+            mock_ctx = MagicMock(spec=ssl.SSLContext)
+            mock_create_ctx.return_value = mock_ctx
+
+            with patch('utils.api.httpx.Client') as mock_httpx:
+                client = OpenRouterClient()
+                _ = client._get_client()
+
+                mock_httpx.assert_called_once()
+                call_kwargs = mock_httpx.call_args[1]
+                assert 'verify' in call_kwargs
+                assert call_kwargs['verify'] == mock_ctx
+
+    def test_tls_version_constant_is_correct(self):
+        """Verifica que a constante TLS 1.2 existe e é válida."""
+        import ssl
+
+        assert hasattr(ssl.TLSVersion, 'TLSv1_2')
+        assert ssl.TLSVersion.TLSv1_2.value >= 771

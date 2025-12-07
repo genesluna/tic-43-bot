@@ -1000,3 +1000,85 @@ class TestConcurrentSaveOperations:
         assert len(errors) == 0
         assert success_count[0] == 10
         assert os.path.exists(tmp_path / "history" / "shared.json")
+
+
+class TestSymlinkProtection:
+    """Testes para proteção contra symlinks."""
+
+    def test_load_from_file_rejects_symlink(self, tmp_path, monkeypatch):
+        """Symlinks devem ser rejeitados ao carregar."""
+        monkeypatch.chdir(tmp_path)
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+
+        real_file = tmp_path / "real_history.json"
+        real_file.write_text(json.dumps({
+            "timestamp": "2024-01-01T00:00:00",
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "test"}]
+        }))
+
+        symlink_file = history_dir / "symlink.json"
+        symlink_file.symlink_to(real_file)
+
+        manager = ConversationManager()
+
+        with pytest.raises(ConversationLoadError) as exc_info:
+            manager.load_from_file("symlink.json")
+
+        assert "simbólicos" in str(exc_info.value)
+
+    def test_list_history_files_skips_symlinks(self, tmp_path, monkeypatch):
+        """Symlinks devem ser ignorados ao listar históricos."""
+        monkeypatch.chdir(tmp_path)
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+
+        real_file = history_dir / "real.json"
+        real_file.write_text(json.dumps({
+            "timestamp": "2024-01-01T00:00:00",
+            "model": "test-model",
+            "messages": []
+        }))
+
+        external_file = tmp_path / "external.json"
+        external_file.write_text(json.dumps({
+            "timestamp": "2024-01-02T00:00:00",
+            "model": "external-model",
+            "messages": []
+        }))
+
+        symlink_file = history_dir / "symlink.json"
+        symlink_file.symlink_to(external_file)
+
+        manager = ConversationManager()
+        files = manager.list_history_files()
+
+        filenames = [f[0] for f in files]
+        assert "real.json" in filenames
+        assert "symlink.json" not in filenames
+
+    def test_symlink_to_directory_rejected(self, tmp_path, monkeypatch):
+        """Symlink para diretório deve ser rejeitado."""
+        monkeypatch.chdir(tmp_path)
+        history_dir = tmp_path / "history"
+        history_dir.mkdir()
+
+        target_dir = tmp_path / "target_dir"
+        target_dir.mkdir()
+        target_file = target_dir / "secret.json"
+        target_file.write_text(json.dumps({
+            "timestamp": "2024-01-01T00:00:00",
+            "model": "test",
+            "messages": [{"role": "user", "content": "secret"}]
+        }))
+
+        symlink_file = history_dir / "link.json"
+        symlink_file.symlink_to(target_file)
+
+        manager = ConversationManager()
+
+        with pytest.raises(ConversationLoadError) as exc_info:
+            manager.load_from_file("link.json")
+
+        assert "simbólicos" in str(exc_info.value)

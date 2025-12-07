@@ -375,3 +375,74 @@ class TestConfigUpperBounds:
         cfg = Config()
 
         assert cfg.MAX_HISTORY_SIZE == 100
+
+
+class TestHistoryDirValidation:
+    """Testes para validação do HISTORY_DIR."""
+
+    def test_history_dir_default_value(self, monkeypatch):
+        """HISTORY_DIR padrão deve ser ./history."""
+        from utils.config import Config
+
+        monkeypatch.delenv("HISTORY_DIR", raising=False)
+        cfg = Config()
+
+        assert cfg.HISTORY_DIR == "./history"
+
+    def test_history_dir_relative_path_accepted(self, tmp_path, monkeypatch):
+        """Caminho relativo dentro do projeto é aceito."""
+        from utils.config import Config
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HISTORY_DIR", "./custom_history")
+        cfg = Config()
+
+        assert cfg.HISTORY_DIR == "./custom_history"
+
+    def test_history_dir_subdirectory_accepted(self, tmp_path, monkeypatch):
+        """Subdiretório dentro do projeto é aceito."""
+        from utils.config import Config
+
+        monkeypatch.chdir(tmp_path)
+        subdir = tmp_path / "data" / "history"
+        subdir.mkdir(parents=True)
+        monkeypatch.setenv("HISTORY_DIR", str(subdir))
+        cfg = Config()
+
+        assert cfg.HISTORY_DIR == str(subdir)
+
+    def test_history_dir_absolute_path_outside_rejected(self, tmp_path, monkeypatch):
+        """Caminho absoluto fora do projeto é rejeitado."""
+        from utils.config import Config
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HISTORY_DIR", "/tmp/malicious_history")
+        cfg = Config()
+
+        assert cfg.HISTORY_DIR == "./history"
+
+    def test_history_dir_parent_traversal_rejected(self, tmp_path, monkeypatch):
+        """Tentativa de path traversal com .. é rejeitada."""
+        from utils.config import Config
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        monkeypatch.chdir(project_dir)
+        monkeypatch.setenv("HISTORY_DIR", "../outside_project")
+        cfg = Config()
+
+        assert cfg.HISTORY_DIR == "./history"
+
+    def test_history_dir_logs_warning_on_rejection(self, tmp_path, monkeypatch, caplog):
+        """Warning é logado quando HISTORY_DIR é rejeitado."""
+        import logging
+        from utils.config import Config
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HISTORY_DIR", "/etc/passwd")
+
+        with caplog.at_level(logging.WARNING):
+            cfg = Config()
+            _ = cfg.HISTORY_DIR
+
+        assert any("fora do diretório do projeto" in record.message for record in caplog.records)
