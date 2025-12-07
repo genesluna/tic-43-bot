@@ -73,7 +73,6 @@ def setup_logging(
         Parâmetros explícitos têm precedência sobre variáveis de ambiente.
         Isso evita mutação de os.environ e é thread-safe.
     """
-    # Track if logging was explicitly requested (param or env var)
     log_level_requested = log_level is not None or os.getenv("LOG_LEVEL") is not None
 
     log_level = (log_level or os.getenv("LOG_LEVEL", "WARNING")).upper()
@@ -93,7 +92,6 @@ def setup_logging(
     else:
         formatter = ConsoleFormatter()
 
-    # Only add console handler if logging was explicitly requested
     if log_level_requested:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setFormatter(formatter)

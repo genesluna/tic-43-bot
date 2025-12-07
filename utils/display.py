@@ -5,8 +5,6 @@ import random
 import time
 import threading
 
-# Importa readline para habilitar edição de linha e histórico no input().
-# É um import por efeito colateral que melhora a experiência no terminal.
 try:
     import readline
     HAS_READLINE = True
@@ -64,7 +62,6 @@ class ChatCompleter:
 
         line_lower = line.lower().strip()
 
-        # Se estamos digitando após /carregar ou /load, completar com arquivos
         if line_lower.startswith("/carregar ") or line_lower.startswith("/load "):
             prefix = text.lower()
             matches = [f for f in self._history_files if f.lower().startswith(prefix)]
@@ -72,7 +69,6 @@ class ChatCompleter:
                 return matches[state]
             return None
 
-        # Completar comandos
         if not text or text.startswith("/") or text in ("s", "sa", "sai", "sair",
                                                           "e", "ex", "exi", "exit",
                                                           "q", "qu", "qui", "quit"):
@@ -197,8 +193,6 @@ class RotatingSpinner:
 
                 self.char_index = (self.char_index + 1) % len(self.spinner_chars)
 
-            # Null check outside lock - live was captured while valid but could
-            # be stopped by another thread between lock release and update call
             if live is not None:
                 try:
                     live.update(self._get_renderable())
@@ -520,7 +514,6 @@ class Display:
             self.completer.set_history_files([])
             return
 
-        # Atualiza autocomplete com os nomes de arquivo
         self.completer.set_history_files([f[0] for f in files])
 
         self.console.print("[bold dim]Arquivos de histórico disponíveis:[/bold dim]")
@@ -547,8 +540,6 @@ class Display:
     def prompt_input(self) -> str:
         """Solicita entrada do usuário."""
         try:
-            # Usa marcadores readline (\001 e \002) para indicar caracteres não-imprimíveis
-            # Isso evita que o readline conte os códigos ANSI como caracteres visíveis
             prompt = "\001\033[1;36m\002>\001\033[0m\002 "
             return input(prompt)
         except EOFError:

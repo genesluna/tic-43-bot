@@ -261,7 +261,6 @@ class OpenRouterClient:
                 )
             return min(retry_after, DEFAULT_MAX_BACKOFF)
         backoff = DEFAULT_INITIAL_BACKOFF * (DEFAULT_BACKOFF_MULTIPLIER ** attempt)
-        # Jitter adds randomness to avoid thundering herd: value in [0.5, 1.5]
         jitter = JITTER_MIN + random.random()
         return min(backoff * jitter, DEFAULT_MAX_BACKOFF)
 
@@ -481,9 +480,6 @@ class OpenRouterClient:
                         json=payload,
                     ) as response:
                         if response.status_code >= 400:
-                            # Em streaming, o corpo não é lido automaticamente.
-                            # Lê o corpo para obter mensagem de erro (exceto 401,
-                            # onde já sabemos que é erro de autenticação).
                             if response.status_code != 401:
                                 response.read()
                             should_proceed, error = self._handle_response_error(

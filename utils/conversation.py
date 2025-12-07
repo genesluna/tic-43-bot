@@ -168,8 +168,6 @@ class ConversationManager:
         }
 
         try:
-            # Escrita atômica: escreve em arquivo temporário e move
-            # Isso evita arquivos corrompidos em caso de falha ou disco cheio
             fd, tmp_path = tempfile.mkstemp(suffix='.json', dir=save_dir)
             try:
                 with os.fdopen(fd, 'w', encoding='utf-8') as f:
@@ -178,7 +176,6 @@ class ConversationManager:
                     os.fsync(f.fileno())
                 shutil.move(tmp_path, filepath)
             except Exception:
-                # Remove arquivo temporário em caso de erro
                 try:
                     if os.path.exists(tmp_path):
                         os.unlink(tmp_path)
