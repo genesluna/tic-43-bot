@@ -855,3 +855,61 @@ class TestDisplayCleanup:
         display.cleanup()
 
         assert display.spinner.running is False
+
+
+class TestChatCompleter:
+    """Testes para o ChatCompleter."""
+
+    def test_completer_init(self):
+        """Verifica inicialização do completer."""
+        from utils.display import ChatCompleter
+
+        completer = ChatCompleter()
+
+        assert completer._history_files == []
+
+    def test_completer_repr(self):
+        """Verifica representação do completer."""
+        from utils.display import ChatCompleter
+
+        completer = ChatCompleter()
+        completer.set_history_files(["a.json", "b.json"])
+
+        assert "history_files=2" in repr(completer)
+
+    def test_set_history_files(self):
+        """Verifica que set_history_files atualiza a lista."""
+        from utils.display import ChatCompleter
+
+        completer = ChatCompleter()
+        completer.set_history_files(["file1.json", "file2.json"])
+
+        assert completer._history_files == ["file1.json", "file2.json"]
+
+    def test_display_has_completer(self):
+        """Verifica que Display tem um completer."""
+        display = Display()
+
+        assert hasattr(display, "completer")
+        assert display.completer is not None
+
+    def test_show_history_list_updates_completer(self):
+        """Verifica que show_history_list atualiza o completer."""
+        display = Display()
+        files = [
+            ("history_1.json", "2024-01-01T00:00:00", "model1"),
+            ("history_2.json", "2024-01-02T00:00:00", "model2"),
+        ]
+
+        display.show_history_list(files)
+
+        assert display.completer._history_files == ["history_1.json", "history_2.json"]
+
+    def test_show_history_list_empty_clears_completer(self):
+        """Verifica que lista vazia limpa o completer."""
+        display = Display()
+        display.completer.set_history_files(["old.json"])
+
+        display.show_history_list([])
+
+        assert display.completer._history_files == []

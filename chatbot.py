@@ -101,9 +101,10 @@ def handle_command(
         display.show_success("Histórico limpo!")
         return CommandResult.CONTINUE
 
-    if user_input_lower in config.SAVE_COMMANDS:
+    save_arg = _extract_command_arg(user_input, config.SAVE_COMMANDS)
+    if save_arg is not None:
         try:
-            filename = conversation.save_to_file()
+            filename = conversation.save_to_file(save_arg if save_arg else None)
             display.show_success(f"Histórico salvo em: {filename}")
         except IOError as e:
             logger.error("Falha ao salvar histórico: %s", e)

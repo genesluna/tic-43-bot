@@ -8,21 +8,79 @@ import threading
 # Importa readline para habilitar edição de linha e histórico no input().
 # É um import por efeito colateral que melhora a experiência no terminal.
 try:
-    import readline  # noqa: F401
+    import readline
+    HAS_READLINE = True
 except ImportError:
     try:
-        import pyreadline3  # noqa: F401
+        import pyreadline3 as readline  # type: ignore
+        HAS_READLINE = True
     except ImportError:
-        pass
+        readline = None  # type: ignore
+        HAS_READLINE = False
 from datetime import datetime
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
 from rich.text import Text
 
-__all__ = ["Display", "RotatingSpinner", "StreamingTextDisplay", "THINKING_WORDS"]
+__all__ = ["Display", "RotatingSpinner", "StreamingTextDisplay", "THINKING_WORDS", "ChatCompleter"]
 
 logger = logging.getLogger(__name__)
+
+
+class ChatCompleter:
+    """Autocompleção para comandos do chatbot."""
+
+    COMMANDS = [
+        "sair", "exit", "quit",
+        "/limpar", "/clear",
+        "/salvar", "/save",
+        "/listar", "/list",
+        "/carregar", "/load",
+        "/ajuda", "/help",
+        "/modelo", "/model",
+        "/streaming", "/stream",
+    ]
+
+    def __init__(self) -> None:
+        self._history_files: list[str] = []
+
+    def __repr__(self) -> str:
+        return f"ChatCompleter(history_files={len(self._history_files)})"
+
+    def set_history_files(self, files: list[str]) -> None:
+        """Atualiza lista de arquivos de histórico disponíveis."""
+        self._history_files = files
+
+    def complete(self, text: str, state: int) -> str | None:
+        """Função de autocompleção para readline."""
+        if readline is None:
+            return None
+
+        try:
+            line = readline.get_line_buffer()
+        except Exception:
+            return None
+
+        line_lower = line.lower().strip()
+
+        # Se estamos digitando após /carregar ou /load, completar com arquivos
+        if line_lower.startswith("/carregar ") or line_lower.startswith("/load "):
+            prefix = text.lower()
+            matches = [f for f in self._history_files if f.lower().startswith(prefix)]
+            if state < len(matches):
+                return matches[state]
+            return None
+
+        # Completar comandos
+        if not text or text.startswith("/") or text in ("s", "sa", "sai", "sair",
+                                                          "e", "ex", "exi", "exit",
+                                                          "q", "qu", "qui", "quit"):
+            matches = [c for c in self.COMMANDS if c.startswith(text.lower())]
+            if state < len(matches):
+                return matches[state]
+
+        return None
 
 SPINNER_REFRESH_RATE = 12  # Hz - taxa de atualização do spinner
 STREAMING_REFRESH_RATE = 10  # Hz - taxa de atualização do streaming
@@ -322,9 +380,22 @@ class Display:
         self.console: Console = Console()
         self.spinner: RotatingSpinner = RotatingSpinner(self.console)
         self.streaming: StreamingTextDisplay = StreamingTextDisplay(self.console)
+        self.completer: ChatCompleter = ChatCompleter()
+        self._setup_readline()
 
     def __repr__(self) -> str:
         return f"Display(spinner={self.spinner.running}, streaming={self.streaming.running})"
+
+    def _setup_readline(self) -> None:
+        """Configura readline para autocompleção."""
+        if not HAS_READLINE or readline is None:
+            return
+        try:
+            readline.set_completer(self.completer.complete)
+            readline.set_completer_delims(" \t\n")
+            readline.parse_and_bind("tab: complete")
+        except Exception as e:
+            logger.debug("Falha ao configurar readline: %s", e)
 
     def cleanup(self) -> None:
         """Para spinner e streaming de forma segura, ignorando erros."""
@@ -363,9 +434,9 @@ class Display:
         commands = [
             ("sair, exit, quit", "Encerra o chatbot"),
             ("/limpar, /clear", "Limpa o histórico da conversa"),
-            ("/salvar, /save", "Salva o histórico em arquivo"),
+            ("/salvar, /save \\[nome]", "Salva o histórico em arquivo"),
             ("/listar, /list", "Lista históricos salvos"),
-            ("/carregar, /load", "Carrega histórico de arquivo"),
+            ("/carregar, /load <arquivo>", "Carrega histórico de arquivo"),
             ("/ajuda, /help", "Mostra esta mensagem"),
             ("/modelo, /model \\[nome]", "Mostra ou altera o modelo atual"),
             ("/streaming, /stream", "Alterna modo streaming on/off"),
@@ -373,6 +444,9 @@ class Display:
         for cmd, desc in commands:
             self.console.print(f"  [bold cyan]{cmd:<28}[/bold cyan] [dim]{desc}[/dim]")
         self.console.print()
+        if HAS_READLINE:
+            self.console.print("[dim]Dica: Use Tab para autocompletar comandos e nomes de arquivo.[/dim]")
+            self.console.print()
 
     def show_bot_message(self, message: str) -> None:
         """Exibe uma resposta do bot com suporte a Markdown."""
@@ -443,7 +517,11 @@ class Display:
         if not files:
             self.console.print("[dim]Nenhum arquivo de histórico encontrado.[/dim]")
             self.console.print()
+            self.completer.set_history_files([])
             return
+
+        # Atualiza autocomplete com os nomes de arquivo
+        self.completer.set_history_files([f[0] for f in files])
 
         self.console.print("[bold dim]Arquivos de histórico disponíveis:[/bold dim]")
         self.console.print()
@@ -459,7 +537,11 @@ class Display:
                 f"[dim]({model})[/dim]"
             )
         self.console.print()
-        self.console.print("[dim]Use /carregar <nome_arquivo> para carregar.[/dim]")
+        hint = "[dim]Use /carregar <nome_arquivo> para carregar"
+        if HAS_READLINE:
+            hint += " (Tab para autocompletar)"
+        hint += ".[/dim]"
+        self.console.print(hint)
         self.console.print()
 
     def prompt_input(self) -> str:

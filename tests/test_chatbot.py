@@ -93,6 +93,31 @@ class TestHandleCommand:
         assert result == CommandResult.CONTINUE
         self.mock_display.show_error.assert_called_once()
 
+    def test_save_command_with_filename(self):
+        """Verifica se '/salvar nome.json' usa o nome personalizado."""
+        self.mock_conversation.save_to_file.return_value = "history/meu_arquivo.json"
+        result = handle_command(
+            "/salvar meu_arquivo.json",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result == CommandResult.CONTINUE
+        self.mock_conversation.save_to_file.assert_called_once_with("meu_arquivo.json")
+        self.mock_display.show_success.assert_called_once()
+
+    def test_save_command_english_with_filename(self):
+        """Verifica se '/save nome.json' usa o nome personalizado."""
+        self.mock_conversation.save_to_file.return_value = "history/custom.json"
+        result = handle_command(
+            "/save custom.json",
+            self.mock_conversation,
+            self.mock_client,
+            self.mock_display,
+        )
+        assert result == CommandResult.CONTINUE
+        self.mock_conversation.save_to_file.assert_called_once_with("custom.json")
+
     def test_help_command(self):
         """Verifica se '/ajuda' mostra ajuda."""
         result = handle_command(
