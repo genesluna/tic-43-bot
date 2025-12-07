@@ -4,6 +4,7 @@
 [![License: Educational](https://img.shields.io/badge/license-Educational-green.svg)](#licença)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testes)
 [![Coverage](https://img.shields.io/badge/coverage->80%25-brightgreen.svg)](#testes)
+[![Wiki](https://img.shields.io/badge/docs-wiki-blue.svg)](https://github.com/genesluna/tic-43-bot/wiki)
 
 **Projeto de Conclusão do Curso TIC-43**
 
@@ -241,6 +242,19 @@ chatbot-tic43/
 ├── requirements-dev.txt   # Dependências de desenvolvimento
 └── .env.example           # Template de configuração
 ```
+
+---
+
+## Documentação
+
+Para documentação completa, consulte a [Wiki do projeto](https://github.com/genesluna/tic-43-bot/wiki):
+
+- [Instalação](https://github.com/genesluna/tic-43-bot/wiki/Instalação) - Guia completo de setup
+- [Configuração](https://github.com/genesluna/tic-43-bot/wiki/Configuração) - Todas as variáveis de ambiente
+- [Comandos](https://github.com/genesluna/tic-43-bot/wiki/Comandos) - Referência completa
+- [Arquitetura](https://github.com/genesluna/tic-43-bot/wiki/Arquitetura) - Visão técnica
+- [Segurança](https://github.com/genesluna/tic-43-bot/wiki/Segurança) - Controles implementados
+- [FAQ](https://github.com/genesluna/tic-43-bot/wiki/FAQ) - Perguntas frequentes
 
 ---
 
