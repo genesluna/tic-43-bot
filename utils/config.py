@@ -11,11 +11,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Limite máximo de caracteres por mensagem armazenada/enviada à API.
-# Diferente de MAX_MESSAGE_LENGTH (limite de entrada do usuário para UX).
 MAX_MESSAGE_CONTENT_SIZE = 100_000
 
-# Upper bounds para configurações (previne DoS por configuração incorreta)
 MAX_MESSAGE_LENGTH_UPPER = 100_000
 MAX_HISTORY_SIZE_UPPER = 500
 

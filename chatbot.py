@@ -19,7 +19,6 @@ from utils.config import config, ConfigurationError
 from utils.logging_config import setup_logging
 from utils.version import __version__
 
-# Aproximação: ~4 caracteres por token (varia por modelo e idioma)
 CHARS_PER_TOKEN = 4
 
 logger = logging.getLogger(__name__)
@@ -28,10 +27,10 @@ logger = logging.getLogger(__name__)
 class CommandResult(Enum):
     """Resultado do processamento de comandos."""
 
-    CONTINUE = auto()  # Continua o loop principal
-    EXIT = auto()      # Encerra o chatbot
-    NOT_COMMAND = auto()  # Não é um comando, processar como mensagem
-    TOGGLE_STREAM = auto()  # Alterna modo streaming
+    CONTINUE = auto()
+    EXIT = auto()
+    NOT_COMMAND = auto() 
+    TOGGLE_STREAM = auto()
 
 
 def _extract_command_arg(user_input: str, commands: tuple[str, ...]) -> str | None:
@@ -158,8 +157,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Loop principal do chatbot."""
     args = parse_args(argv)
 
-    # Pass parameters directly to setup_logging instead of mutating os.environ
-    # This is thread-safe and avoids side effects on the global environment
     setup_logging(
         log_level=args.log_level,
         log_file=args.log_file
@@ -184,7 +181,6 @@ def main(argv: Sequence[str] | None = None) -> None:
                 sys.exit(1)
         conversation = ConversationManager()
 
-        # Determina modo de streaming (CLI sobrescreve config)
         use_streaming = config.STREAM_RESPONSE and not args.no_stream
 
         display.show_banner()

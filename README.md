@@ -12,6 +12,10 @@ Desenvolvido como trabalho de conclusão do curso **TIC 43 - Capacitação Tecno
 
 Um chatbot interativo via terminal que utiliza modelos de IA generativa através da API [OpenRouter](https://openrouter.ai) para manter conversas contextualizadas.
 
+### Veja o bot em ação
+
+[![Demonstração do Chatbot](https://img.youtube.com/vi/7nMJfkMRnws/maxresdefault.jpg)](https://youtu.be/7nMJfkMRnws)
+
 ---
 
 ## Funcionalidades
