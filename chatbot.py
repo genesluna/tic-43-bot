@@ -8,7 +8,6 @@ manter conversas contextualizadas com o usuário.
 
 import argparse
 import logging
-import os
 import sys
 from enum import Enum, auto
 from typing import Sequence
@@ -18,11 +17,10 @@ from utils.conversation import ConversationManager, ConversationLoadError
 from utils.display import Display
 from utils.config import config, ConfigurationError
 from utils.logging_config import setup_logging
+from utils.version import __version__
 
 # Aproximação: ~4 caracteres por token (varia por modelo e idioma)
 CHARS_PER_TOKEN = 4
-
-__version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
 
@@ -227,18 +225,19 @@ def main(argv: Sequence[str] | None = None) -> None:
                     char_count = 0
                     response_buffer: list[str] = []
 
-                    for chunk in client.send_message_stream(messages):
-                        if first_chunk:
+                    with client.send_message_stream(messages) as stream:
+                        for chunk in stream:
+                            if first_chunk:
+                                if use_streaming:
+                                    display.transition_spinner_to_streaming()
+                                first_chunk = False
+
+                            response_buffer.append(chunk)
+                            char_count += len(chunk)
+                            display.update_spinner_tokens(char_count // CHARS_PER_TOKEN)
+
                             if use_streaming:
-                                display.transition_spinner_to_streaming()
-                            first_chunk = False
-
-                        response_buffer.append(chunk)
-                        char_count += len(chunk)
-                        display.update_spinner_tokens(char_count // CHARS_PER_TOKEN)
-
-                        if use_streaming:
-                            display.add_streaming_chunk(chunk)
+                                display.add_streaming_chunk(chunk)
 
                     if first_chunk:
                         display.stop_spinner()
