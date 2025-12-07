@@ -68,7 +68,7 @@ python chatbot.py
 python chatbot.py --help              # Exibe ajuda
 python chatbot.py --version           # Exibe versão
 python chatbot.py -m anthropic/claude-3.5-sonnet  # Define modelo
-python chatbot.py --no-stream         # Mostra tokens animados enquanto aguarda
+python chatbot.py --no-stream         # Desativa streaming (mostra spinner com tokens)
 python chatbot.py --log-level DEBUG   # Ativa logging detalhado
 python chatbot.py --log-file app.log  # Salva logs em arquivo
 ```
